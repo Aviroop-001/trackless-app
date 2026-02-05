@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Palette: Midnight + Electric Cyan */
+    --bg: #070a12;
+    --surface: #0b1222;
+    --surface2: #101a33;
+    --text: #eaf2ff;
+    --muted: #a3b3cc;
+    --accent: #22d3ee; /* cyan-400 */
+    --accent2: #60a5fa; /* blue-400 */
+  }
+
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  /* Dark theme scoped to landing & pricing pages */
+  .theme-dark {
+    color-scheme: dark;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .theme-dark ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+    color: var(--text);
+  }
+
+  /* Light theme for demo page */
+  .theme-light {
+    color-scheme: light;
+    background: #f8f9fb;
+    color: #0f172a;
+  }
+}
+
+@layer utilities {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* ── Glassmorphism ── */
+
+  .glass {
+    background: color-mix(in oklab, white 6%, transparent);
+    border: 1px solid color-mix(in oklab, white 16%, transparent);
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, white 10%, transparent) inset,
+      0 18px 50px -30px rgba(0, 0, 0, 0.8);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .glass-chip {
+    background: color-mix(in oklab, white 8%, transparent);
+    border: 1px solid color-mix(in oklab, white 14%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  .btn-glass-primary {
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--accent) 62%, transparent),
+        color-mix(in oklab, var(--accent2) 58%, transparent)
+      ),
+      color-mix(in oklab, white 6%, transparent);
+    border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+    box-shadow:
+      0 1px 0 0 color-mix(in oklab, white 10%, transparent) inset,
+      0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent),
+      0 26px 70px -55px color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+
+  .btn-glass-primary:hover {
+    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--accent) 70%, transparent),
+        color-mix(in oklab, var(--accent2) 66%, transparent)
+      ),
+      color-mix(in oklab, white 7%, transparent);
+  }
+
+  .ring-soft {
+    @apply ring-1 ring-white/10;
+  }
+
+  .border-soft {
+    @apply border border-white/10;
+  }
+
+  .glow-accent {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent) 25%, transparent),
+      0 30px 80px -40px color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  /* ── Scroll-reveal (Reveal.jsx — PricingPage) ── */
+
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    filter: blur(0.2px);
+    transition:
+      opacity 700ms cubic-bezier(0.2, 0.9, 0.2, 1),
+      transform 700ms cubic-bezier(0.2, 0.9, 0.2, 1),
+      filter 700ms cubic-bezier(0.2, 0.9, 0.2, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  .reveal.is-revealed {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0px);
+  }
+
+  /* ── Palantir-style scroll-driven sections (LandingPage) ── */
+
+  .scroll-section {
+    opacity: 0;
+    transform: translateY(40px);
+    transition:
+      opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  .scroll-section.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Demo page animations ── */
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ── Reduced motion ── */
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .reveal,
+    .scroll-section {
+      opacity: 1;
+      transform: none;
+      filter: none;
+      transition: none;
+    }
+
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}

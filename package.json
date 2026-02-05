@@ -1,0 +1,16 @@
+{
+  "name": "trackless",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:client",
+    "dev:client": "npm run dev --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "build": "npm run build --workspace=client",
+    "start": "NODE_ENV=production npm run start --workspace=server",
+    "lint": "npm run lint --workspace=client",
+    "preview": "npm run build && npm run start"
+  }
+}
