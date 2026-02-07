@@ -2,16 +2,11 @@ import { Link, useLocation } from 'react-router-dom'
 
 function LogoMark({ className = '' }) {
   return (
-    <div
-      className={[
-        'grid h-9 w-9 place-items-center rounded-xl',
-        'bg-linear-to-br from-(--accent) to-(--accent2) text-slate-950',
-        className,
-      ].join(' ')}
-      aria-hidden="true"
-    >
-      <span className="text-sm font-semibold tracking-tight">N</span>
-    </div>
+    <img
+      src="/favicon.png"
+      alt="Nudge AI"
+      className={['h-9 w-9 rounded-xl', className].join(' ')}
+    />
   )
 }
 

@@ -1321,7 +1321,7 @@ export default function DemoPage() {
       {/* SIDEBAR */}
       <aside className="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-5">
-          <Link to="/" className="flex items-center gap-2.5"><div className="grid h-7 w-7 place-items-center rounded-md bg-linear-to-br from-violet-600 to-cyan-500 text-white"><span className="text-[11px] font-bold tracking-tight">N</span></div><span className="text-sm font-semibold tracking-tight text-slate-900">Nudge AI</span></Link>
+          <Link to="/" className="flex items-center gap-2.5"><img src="/favicon.png" alt="Nudge AI" className="h-7 w-7 rounded-md" /><span className="text-sm font-semibold tracking-tight text-slate-900">Nudge AI</span></Link>
           <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Demo</span>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
