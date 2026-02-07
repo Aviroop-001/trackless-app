@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 /* ───────────────────────── constants ───────────────────────── */
 
-const STORAGE_KEY = 'nudgeai_demo_v4'
+const STORAGE_KEY = 'nudgeai_demo_v6'
 
 const STATUSES = [
   { id: 'inbox', label: 'Inbox', dot: 'bg-slate-400' },
@@ -19,7 +19,9 @@ const PRIORITIES = [
   { id: 'p3', label: 'Low', short: 'P3', bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
 ]
 
-const NAV = { projects: 'projects', users: 'users', board: 'board' }
+const NAV = { projects: 'projects', users: 'users', teams: 'teams', board: 'board', settings: 'settings' }
+
+const DEFAULT_SETTINGS = { theme: 'light', defaultView: 'kanban', sidebarCollapsed: false, density: 'comfortable' }
 const BOARD_VIEWS = { kanban: 'kanban', list: 'list' }
 
 const TAG_PALETTE = [
@@ -31,6 +33,15 @@ const TAG_PALETTE = [
   { bg: 'bg-blue-100', text: 'text-blue-700' },
   { bg: 'bg-orange-100', text: 'text-orange-700' },
   { bg: 'bg-teal-100', text: 'text-teal-700' },
+]
+
+const TEAM_COLORS = [
+  { id: 'blue', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200', pill: 'bg-blue-100 text-blue-700' },
+  { id: 'rose', dot: 'bg-rose-500', bg: 'bg-rose-50', text: 'text-rose-700', ring: 'ring-rose-200', pill: 'bg-rose-100 text-rose-700' },
+  { id: 'amber', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200', pill: 'bg-amber-100 text-amber-700' },
+  { id: 'emerald', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', pill: 'bg-emerald-100 text-emerald-700' },
+  { id: 'violet', dot: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700', ring: 'ring-violet-200', pill: 'bg-violet-100 text-violet-700' },
+  { id: 'cyan', dot: 'bg-cyan-500', bg: 'bg-cyan-50', text: 'text-cyan-700', ring: 'ring-cyan-200', pill: 'bg-cyan-100 text-cyan-700' },
 ]
 
 /* ───────────────────────── helpers ──────────────────────────── */
@@ -59,8 +70,18 @@ function derivePrefix(name) {
 
 function taskKey(prefix, number) { return `${prefix}-${number}` }
 
-/** Render comment text with highlighted @mentions */
-function renderMentionText(text, userNames) {
+/** Resolve assigneeId to { type: 'user'|'team', entity } or null */
+function resolveAssignee(assigneeId, users, teams) {
+  if (!assigneeId) return null
+  const user = users.find((u) => u.id === assigneeId)
+  if (user) return { type: 'user', entity: user }
+  const team = (teams ?? []).find((t) => t.id === assigneeId)
+  if (team) return { type: 'team', entity: team }
+  return null
+}
+
+/** Render comment text with highlighted @mentions (users + teams) */
+function renderMentionText(text, userNames, teams = []) {
   const parts = []
   let remaining = text
   let key = 0
@@ -70,12 +91,25 @@ function renderMentionText(text, userNames) {
     if (atIdx > 0) parts.push(remaining.slice(0, atIdx))
     remaining = remaining.slice(atIdx)
     let matched = false
+    // try user names first
     for (const name of userNames) {
       if (remaining.slice(1).startsWith(name)) {
         parts.push(<span key={key++} className="inline-block bg-cyan-100 text-cyan-700 rounded px-1 font-medium text-[12px]">@{name}</span>)
         remaining = remaining.slice(1 + name.length)
         matched = true
         break
+      }
+    }
+    // try team names
+    if (!matched) {
+      for (const team of teams) {
+        if (remaining.slice(1).startsWith(team.name)) {
+          const tc = TEAM_COLORS.find((c) => c.id === team.color) ?? TEAM_COLORS[0]
+          parts.push(<span key={key++} className={['inline-block rounded px-1 font-medium text-[12px]', tc.pill].join(' ')}>@{team.name}</span>)
+          remaining = remaining.slice(1 + team.name.length)
+          matched = true
+          break
+        }
       }
     }
     if (!matched) { parts.push('@'); remaining = remaining.slice(1) }
@@ -107,7 +141,15 @@ function seedUsers() {
   }))
 }
 
-function seedTasks(p1, p2, users) {
+function seedTeams(users) {
+  const now = Date.now()
+  return [
+    { id: uid(), name: 'Engineering', color: 'blue', memberIds: [users[0]?.id, users[1]?.id].filter(Boolean), createdAt: now - 1000 * 60 * 60 * 48 },
+    { id: uid(), name: 'Design', color: 'rose', memberIds: [users[2]?.id].filter(Boolean), createdAt: now - 1000 * 60 * 60 * 24 },
+  ]
+}
+
+function seedTasks(p1, p2, users, teams) {
   const now = Date.now()
   const yesterday = new Date(now - 86400000).toISOString().slice(0, 10)
   const in3days = new Date(now + 86400000 * 3).toISOString().slice(0, 10)
@@ -118,8 +160,8 @@ function seedTasks(p1, p2, users) {
       { id: uid(), authorId: users[0]?.id, text: 'Nice catch. Let me review the PR. @Riya Patel can you write the regression test once it\'s merged?', createdAt: now - 1000 * 60 * 45 },
     ], assigneeId: users[0]?.id ?? null, order: 0, createdAt: now - 1000 * 60 * 60 * 3 },
     { id: uid(), projectId: p1, number: 2, title: 'Ship onboarding flow to prod', description: 'The 3-step onboarding is tested and approved. Deploy behind a feature flag first, then roll out 100%.', tags: ['launch'], status: 'done', priority: 'p1', dueDate: null, subtasks: [], comments: [], assigneeId: users[1]?.id ?? null, order: 0, createdAt: now - 1000 * 60 * 60 * 10 },
-    { id: uid(), projectId: p1, number: 3, title: 'Write API docs for public endpoints', description: '', tags: ['docs'], status: 'planned', priority: 'p2', dueDate: in7days, subtasks: [{ id: uid(), title: 'Document /auth endpoints', done: false }, { id: uid(), title: 'Document /tasks CRUD', done: false }], comments: [], assigneeId: null, order: 0, createdAt: now - 1000 * 60 * 60 * 2 },
-    { id: uid(), projectId: p1, number: 4, title: 'Set up error monitoring (Sentry)', description: '', tags: ['infra'], status: 'inbox', priority: 'p1', dueDate: in3days, subtasks: [], comments: [], assigneeId: null, order: 0, createdAt: now - 1000 * 60 * 25 },
+    { id: uid(), projectId: p1, number: 3, title: 'Write API docs for public endpoints', description: '', tags: ['docs'], status: 'planned', priority: 'p2', dueDate: in7days, subtasks: [{ id: uid(), title: 'Document /auth endpoints', done: false }, { id: uid(), title: 'Document /tasks CRUD', done: false }], comments: [], assigneeId: teams?.[1]?.id ?? null, order: 0, createdAt: now - 1000 * 60 * 60 * 2 },
+    { id: uid(), projectId: p1, number: 4, title: 'Set up error monitoring (Sentry)', description: '', tags: ['infra'], status: 'inbox', priority: 'p1', dueDate: in3days, subtasks: [], comments: [], assigneeId: teams?.[0]?.id ?? null, order: 0, createdAt: now - 1000 * 60 * 25 },
     { id: uid(), projectId: p1, number: 5, title: 'Nudge AI: auto-tag + detect duplicates', description: 'Research feasibility of using embeddings to detect duplicate tasks and suggest tags based on title + description content.', tags: ['ai', 'v2'], status: 'inbox', priority: 'p3', dueDate: null, subtasks: [], comments: [], assigneeId: null, order: 1, createdAt: now - 1000 * 60 * 8 },
     { id: uid(), projectId: p2, number: 1, title: 'A/B test pricing page copy', description: '', tags: ['experiment'], status: 'doing', priority: 'p2', dueDate: in3days, subtasks: [{ id: uid(), title: 'Set up Vercel split test', done: true }, { id: uid(), title: 'Monitor for 7 days', done: false }], comments: [], assigneeId: users[2]?.id ?? null, order: 0, createdAt: now - 1000 * 60 * 60 },
     { id: uid(), projectId: p2, number: 2, title: 'Set up referral program', description: '', tags: ['growth'], status: 'planned', priority: 'p2', dueDate: null, subtasks: [], comments: [], assigneeId: null, order: 0, createdAt: now - 1000 * 60 * 30 },
@@ -137,10 +179,11 @@ function normalizeOrders(tasks, pid) {
 
 function getInitialState() {
   const s = typeof window !== 'undefined' ? loadState() : null
-  if (s?.projects && s?.users && s?.tasks) return { projects: s.projects, users: s.users, tasks: s.tasks, activeProjectId: s.activeProjectId ?? null, view: s.view ?? NAV.projects }
+  if (s?.projects && s?.users && s?.tasks) return { projects: s.projects, users: s.users, teams: s.teams ?? [], tasks: s.tasks, activeProjectId: s.activeProjectId ?? null, view: s.view ?? NAV.projects, settings: { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) } }
   const users = seedUsers()
+  const teams = seedTeams(users)
   const projects = seedProjects(users)
-  return { projects, users, tasks: seedTasks(projects[0].id, projects[1].id, users), activeProjectId: null, view: NAV.projects }
+  return { projects, users, teams, tasks: seedTasks(projects[0].id, projects[1].id, users, teams), activeProjectId: null, view: NAV.projects, settings: { ...DEFAULT_SETTINGS } }
 }
 
 /* ───────────────────────── SVG icons ───────────────────────── */
@@ -161,6 +204,15 @@ function IconCommand({ className = 'w-4 h-4' }) { return <svg className={classNa
 function IconCopy({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg> }
 function IconChat({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg> }
 function IconSparkle({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg> }
+function IconTeam({ className = 'w-5 h-5' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" /></svg> }
+function IconPencil({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg> }
+function IconGear({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg> }
+function IconChevronLeft({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> }
+function IconChevronRight({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg> }
+function IconSun({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg> }
+function IconMoon({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg> }
+function IconEye({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg> }
+function IconEyeOff({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg> }
 
 /* ───────────────────────── shared components ───────────────── */
 
@@ -216,15 +268,20 @@ function CopyButton({ text, label = 'Copy link' }) {
 
 /* ───────────────────────── comment input with @mention ──────── */
 
-function CommentInput({ users, onSubmit }) {
+function CommentInput({ users, teams, onSubmit }) {
   const [text, setText] = useState('')
   const [mentionQ, setMentionQ] = useState(null)
   const [mentionIdx, setMentionIdx] = useState(0)
   const ref = useRef(null)
 
-  const filteredUsers = mentionQ !== null
-    ? users.filter((u) => u.name.toLowerCase().includes(mentionQ.toLowerCase())).slice(0, 5)
-    : []
+  // combine users and teams into a single mention list
+  const mentionItems = useMemo(() => {
+    if (mentionQ === null) return []
+    const q = mentionQ.toLowerCase()
+    const userMatches = users.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 4).map((u) => ({ type: 'user', id: u.id, name: u.name, user: u }))
+    const teamMatches = (teams ?? []).filter((t) => t.name.toLowerCase().includes(q)).slice(0, 3).map((t) => ({ type: 'team', id: t.id, name: t.name, team: t }))
+    return [...userMatches, ...teamMatches].slice(0, 6)
+  }, [mentionQ, users, teams])
 
   const handleChange = (e) => {
     const val = e.target.value
@@ -239,26 +296,26 @@ function CommentInput({ users, onSubmit }) {
     setMentionQ(null)
   }
 
-  const insertMention = (user) => {
+  const insertMention = (item) => {
     const cur = ref.current?.selectionStart ?? text.length
     const before = text.slice(0, cur)
     const atIdx = before.lastIndexOf('@')
     const after = text.slice(cur)
-    const next = text.slice(0, atIdx) + `@${user.name} ` + after
+    const next = text.slice(0, atIdx) + `@${item.name} ` + after
     setText(next)
     setMentionQ(null)
     setTimeout(() => {
-      const pos = atIdx + user.name.length + 2
+      const pos = atIdx + item.name.length + 2
       ref.current?.setSelectionRange(pos, pos)
       ref.current?.focus()
     }, 0)
   }
 
   const handleKeyDown = (e) => {
-    if (mentionQ !== null && filteredUsers.length > 0) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx((i) => Math.min(i + 1, filteredUsers.length - 1)) }
+    if (mentionQ !== null && mentionItems.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx((i) => Math.min(i + 1, mentionItems.length - 1)) }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx((i) => Math.max(i - 1, 0)) }
-      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(filteredUsers[mentionIdx]) }
+      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionItems[mentionIdx]) }
       else if (e.key === 'Escape') { setMentionQ(null) }
       return
     }
@@ -270,13 +327,25 @@ function CommentInput({ users, onSubmit }) {
 
   return (
     <div className="relative">
-      {mentionQ !== null && filteredUsers.length > 0 && (
+      {mentionQ !== null && mentionItems.length > 0 && (
         <div className="absolute bottom-full left-0 mb-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden z-10">
-          {filteredUsers.map((u, i) => (
-            <button key={u.id} type="button" onClick={() => insertMention(u)} className={['flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors', i === mentionIdx ? 'bg-cyan-50 text-cyan-700' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>
-              <Avatar name={u.name} size="sm" /><span>{u.name}</span>
-            </button>
-          ))}
+          {mentionItems.map((item, i) => {
+            if (item.type === 'team') {
+              const tc = TEAM_COLORS.find((c) => c.id === item.team.color) ?? TEAM_COLORS[0]
+              return (
+                <button key={`t-${item.id}`} type="button" onClick={() => insertMention(item)} className={['flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors', i === mentionIdx ? 'bg-cyan-50 text-cyan-700' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>
+                  <span className={['inline-flex h-7 w-7 items-center justify-center rounded-full', tc.bg].join(' ')}><span className={['h-2 w-2 rounded-full', tc.dot].join(' ')} /></span>
+                  <span>{item.name}</span>
+                  <span className="ml-auto text-[10px] text-slate-400">Team</span>
+                </button>
+              )
+            }
+            return (
+              <button key={`u-${item.id}`} type="button" onClick={() => insertMention(item)} className={['flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors', i === mentionIdx ? 'bg-cyan-50 text-cyan-700' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>
+                <Avatar name={item.name} size="sm" /><span>{item.name}</span>
+              </button>
+            )
+          })}
         </div>
       )}
       <div className="flex items-end gap-2">
@@ -289,7 +358,7 @@ function CommentInput({ users, onSubmit }) {
 
 /* ───────────────────────── comment list ─────────────────────── */
 
-function CommentList({ comments, users, onDelete }) {
+function CommentList({ comments, users, teams, onDelete }) {
   const userNames = useMemo(() => users.map((u) => u.name), [users])
   if (!comments?.length) return <div className="py-3 text-center text-xs text-slate-400">No comments yet</div>
   return (
@@ -305,7 +374,7 @@ function CommentList({ comments, users, onDelete }) {
                 <span className="text-[11px] text-slate-400">{timeAgo(c.createdAt)}</span>
                 {onDelete && <button type="button" onClick={() => onDelete(c.id)} className="ml-auto rounded p-0.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"><IconX className="w-3 h-3" /></button>}
               </div>
-              <p className="mt-0.5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderMentionText(c.text, userNames)}</p>
+              <p className="mt-0.5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderMentionText(c.text, userNames, teams)}</p>
             </div>
           </div>
         )
@@ -316,7 +385,7 @@ function CommentList({ comments, users, onDelete }) {
 
 /* ───────────────────────── command palette ─────────────────── */
 
-function CommandPalette({ tasks, projects, users, onClose, onSelectTask, onNavigate }) {
+function CommandPalette({ tasks, projects, users, teams, onClose, onSelectTask, onNavigate }) {
   const [q, setQ] = useState('')
   const inputRef = useRef(null)
   useEffect(() => { inputRef.current?.focus() }, [])
@@ -333,10 +402,11 @@ function CommandPalette({ tasks, projects, users, onClose, onSelectTask, onNavig
       }).slice(0, 6),
       projects: projects.filter((p) => p.name.toLowerCase().includes(lower) || p.prefix.toLowerCase().includes(lower)).slice(0, 3),
       users: users.filter((u) => u.name.toLowerCase().includes(lower)).slice(0, 3),
+      teams: (teams ?? []).filter((t) => t.name.toLowerCase().includes(lower)).slice(0, 3),
     }
-  }, [q, tasks, projects, users])
+  }, [q, tasks, projects, users, teams])
 
-  const hasResults = results.tasks.length + results.projects.length + results.users.length > 0
+  const hasResults = results.tasks.length + results.projects.length + results.users.length + results.teams.length > 0
 
   return (
     <>
@@ -387,6 +457,19 @@ function CommandPalette({ tasks, projects, users, onClose, onSelectTask, onNavig
                   ))}
                 </div>
               )}
+              {results.teams.length > 0 && (
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Teams</div>
+                  {results.teams.map((t) => {
+                    const tc = TEAM_COLORS.find((c) => c.id === t.color) ?? TEAM_COLORS[0]
+                    return (
+                      <button key={t.id} type="button" onClick={() => { onNavigate(NAV.teams); onClose() }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                        <span className={['h-2.5 w-2.5 rounded-full shrink-0', tc.dot].join(' ')} />{t.name}<span className="ml-auto text-[10px] text-slate-400">{t.memberIds.length} members</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-4 text-center text-sm text-slate-400">Start typing to search across everything…</div>
@@ -427,7 +510,7 @@ function ShortcutHelp({ onClose }) {
 
 /* ───────────────────────── task detail panel ─────────────────── */
 
-function TaskDetailPanel({ task, project, users, onClose, onUpdate, onDelete, onAddComment, onDeleteComment, buildTaskUrl }) {
+function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDelete, onAddComment, onDeleteComment, buildTaskUrl }) {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(task.title)
   const [descDraft, setDescDraft] = useState(task.description ?? '')
@@ -522,7 +605,8 @@ function TaskDetailPanel({ task, project, users, onClose, onUpdate, onDelete, on
               <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Assignee</label>
               <select value={task.assigneeId ?? ''} onChange={(e) => onUpdate(task.id, { assigneeId: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30">
                 <option value="">Unassigned</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {users.length > 0 && <optgroup label="Users">{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                {(teams ?? []).length > 0 && <optgroup label="Teams">{(teams ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
               </select>
             </div>
           </div>
@@ -565,10 +649,10 @@ function TaskDetailPanel({ task, project, users, onClose, onUpdate, onDelete, on
               Comments {(task.comments ?? []).length > 0 && <span className="text-slate-500 normal-case">({(task.comments ?? []).length})</span>}
             </label>
             <div className="mt-3">
-              <CommentList comments={task.comments ?? []} users={users} onDelete={(cid) => onDeleteComment(task.id, cid)} />
+              <CommentList comments={task.comments ?? []} users={users} teams={teams} onDelete={(cid) => onDeleteComment(task.id, cid)} />
             </div>
             <div className="mt-3">
-              <CommentInput users={users} onSubmit={(text) => onAddComment(task.id, text)} />
+              <CommentInput users={users} teams={teams} onSubmit={(text) => onAddComment(task.id, text)} />
             </div>
           </div>
 
@@ -589,15 +673,18 @@ function TaskDetailPanel({ task, project, users, onClose, onUpdate, onDelete, on
 
 /* ───────────────────────── task card ────────────────────────── */
 
-function TaskCard({ task, project, users, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew }) {
-  const assignee = users.find((u) => u.id === task.assigneeId) || null
+function TaskCard({ task, project, users, teams, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew }) {
+  const resolved = resolveAssignee(task.assigneeId, users, teams ?? [])
+  const assignee = resolved?.type === 'user' ? resolved.entity : null
+  const assignedTeam = resolved?.type === 'team' ? resolved.entity : null
+  const teamColor = assignedTeam ? TEAM_COLORS.find((c) => c.id === assignedTeam.color) ?? TEAM_COLORS[0] : null
   const statusInfo = STATUSES.find((s) => s.id === task.status)
   const overdue = isOverdue(task.dueDate) && task.status !== 'done'
   const commentCount = (task.comments ?? []).length
 
   return (
     <div ref={(el) => registerEl?.(task.id, el)} data-task-id={task.id} draggable onDragStart={(e) => onDragStart?.(e, task.id)} onDragEnd={onDragEnd} onClick={() => onSelect?.(task.id)}
-      className={['group cursor-grab rounded-lg border bg-white p-3 shadow-sm transition-all duration-150 hover:shadow-md active:cursor-grabbing active:shadow-lg', overdue ? 'border-red-200 hover:border-red-300' : 'border-slate-200 hover:border-slate-300', isNew ? 'animate-[slideUp_250ms_ease-out]' : ''].join(' ')}>
+      className={['group cursor-grab rounded-lg border bg-white p-3 shadow-sm transition-all duration-150 hover:shadow-md active:cursor-grabbing active:shadow-lg density-card', overdue ? 'border-red-200 hover:border-red-300' : 'border-slate-200 hover:border-slate-300', isNew ? 'animate-[slideUp_250ms_ease-out]' : ''].join(' ')}>
       <div className="flex items-start gap-2.5">
         {statusInfo && <span className={['mt-1.5 h-2 w-2 shrink-0 rounded-full', statusInfo.dot].join(' ')} />}
         <div className="min-w-0 flex-1">
@@ -613,10 +700,13 @@ function TaskCard({ task, project, users, onAssign, onDragStart, onDragEnd, regi
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             {assignee ? (
               <div className="flex items-center gap-1.5"><Avatar name={assignee.name} size="sm" /><span className="text-[11px] text-slate-500">{assignee.name.split(' ')[0]}</span></div>
+            ) : assignedTeam && teamColor ? (
+              <span className={['inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold', teamColor.pill].join(' ')}><span className={['h-1.5 w-1.5 rounded-full', teamColor.dot].join(' ')} />{assignedTeam.name}</span>
             ) : (
-              <select value="" onChange={(e) => { e.stopPropagation(); onAssign(task.id, e.target.value || null) }} onClick={(e) => e.stopPropagation()} className="h-6 rounded border border-dashed border-slate-200 bg-transparent px-1 text-[10px] text-slate-400 hover:border-slate-300 focus:outline-none" aria-label="Assign user">
+              <select value="" onChange={(e) => { e.stopPropagation(); onAssign(task.id, e.target.value || null) }} onClick={(e) => e.stopPropagation()} className="h-6 rounded border border-dashed border-slate-200 bg-transparent px-1 text-[10px] text-slate-400 hover:border-slate-300 focus:outline-none" aria-label="Assign">
                 <option value="">+ Assign</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {users.length > 0 && <optgroup label="Users">{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>}
+                {(teams ?? []).length > 0 && <optgroup label="Teams">{(teams ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
               </select>
             )}
             <SubtaskProgress subtasks={task.subtasks} />
@@ -649,7 +739,7 @@ function Column({ title, dot, count, children, status, isDropActive, onDropTask,
 
 /* ───────────────────────── list view ─────────────────────────── */
 
-function ListView({ tasks, projects, users, onSelect }) {
+function ListView({ tasks, projects, users, teams, onSelect }) {
   return (
     <div className="divide-y divide-slate-100">
       <div className="grid grid-cols-[70px_1fr_80px_80px_100px_90px_70px] gap-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -657,12 +747,14 @@ function ListView({ tasks, projects, users, onSelect }) {
       </div>
       {tasks.length === 0 && <div className="py-12 text-center text-sm text-slate-400">No tasks match your filters</div>}
       {tasks.map((t) => {
-        const assignee = users.find((u) => u.id === t.assigneeId)
+        const resolved = resolveAssignee(t.assigneeId, users, teams ?? [])
         const status = STATUSES.find((s) => s.id === t.status)
         const proj = projects.find((p) => p.id === t.projectId)
         const overdue = isOverdue(t.dueDate) && t.status !== 'done'
+        const assignLabel = resolved?.type === 'user' ? resolved.entity.name.split(' ')[0] : resolved?.type === 'team' ? resolved.entity.name : '—'
+        const tc = resolved?.type === 'team' ? TEAM_COLORS.find((c) => c.id === resolved.entity.color) ?? TEAM_COLORS[0] : null
         return (
-          <button key={t.id} type="button" onClick={() => onSelect(t.id)} className="grid grid-cols-[70px_1fr_80px_80px_100px_90px_70px] gap-3 px-4 py-3 w-full text-left hover:bg-slate-50 transition-colors items-center">
+          <button key={t.id} type="button" onClick={() => onSelect(t.id)} className="grid grid-cols-[70px_1fr_80px_80px_100px_90px_70px] gap-3 px-4 py-3 w-full text-left hover:bg-slate-50 transition-colors items-center density-list-row">
             <div>{proj && <TaskId prefix={proj.prefix} number={t.number} />}</div>
             <div className="flex items-center gap-2 min-w-0">
               <span className={['h-2 w-2 rounded-full shrink-0', status?.dot].join(' ')} />
@@ -670,7 +762,7 @@ function ListView({ tasks, projects, users, onSelect }) {
             </div>
             <div>{t.priority && <PriorityBadge priority={t.priority} />}</div>
             <div className="text-[11px] text-slate-500">{status?.label}</div>
-            <div className="text-[11px] text-slate-500 truncate">{assignee?.name?.split(' ')[0] ?? '—'}</div>
+            <div>{tc ? <span className={['inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold', tc.pill].join(' ')}>{assignLabel}</span> : <span className="text-[11px] text-slate-500 truncate">{assignLabel}</span>}</div>
             <div className={['text-[11px]', overdue ? 'text-red-600 font-semibold' : 'text-slate-400'].join(' ')}>{t.dueDate ? formatDate(t.dueDate) : '—'}</div>
             <div><SubtaskProgress subtasks={t.subtasks} /></div>
           </button>
@@ -943,12 +1035,10 @@ function buildBoardSummary(tasks, users, project) {
 export default function DemoPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState(() => getInitialState())
-  const { projects, users, tasks, activeProjectId, view } = data
+  const { projects, users, teams, tasks, activeProjectId, view, settings } = data
+  const sidebarCollapsed = settings?.sidebarCollapsed ?? false
 
-  const [newProjectName, setNewProjectName] = useState('')
   const [newUserName, setNewUserName] = useState('')
-  const [newTitle, setNewTitle] = useState('')
-  const [newTags, setNewTags] = useState('')
   const [query, setQuery] = useState('')
   const [tagQuery, setTagQuery] = useState('')
   const [selectedTaskId, setSelectedTaskId] = useState(null)
@@ -959,11 +1049,27 @@ export default function DemoPage() {
   const [showProjectComments, setShowProjectComments] = useState(false)
   const [editingPrefix, setEditingPrefix] = useState(false)
   const [prefixDraft, setPrefixDraft] = useState('')
+  const [showCreateProject, setShowCreateProject] = useState(false)
+  const [projFormName, setProjFormName] = useState('')
+  const [projFormPrefix, setProjFormPrefix] = useState('')
+  const [showCreateTask, setShowCreateTask] = useState(false)
+  const [taskFormTitle, setTaskFormTitle] = useState('')
+  const [taskFormDesc, setTaskFormDesc] = useState('')
+  const [taskFormPriority, setTaskFormPriority] = useState('')
+  const [taskFormStatus, setTaskFormStatus] = useState('inbox')
+  const [taskFormAssignee, setTaskFormAssignee] = useState('')
+  const [taskFormTags, setTaskFormTags] = useState('')
+  const [taskFormDueDate, setTaskFormDueDate] = useState('')
   const [showAiModal, setShowAiModal] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiPreview, setAiPreview] = useState(null) // { projectName, tasks[] }
+  const [editingTeam, setEditingTeam] = useState(null) // null | 'new' | team.id
+  const [teamFormName, setTeamFormName] = useState('')
+  const [teamFormColor, setTeamFormColor] = useState(TEAM_COLORS[0].id)
+  const [teamFormMembers, setTeamFormMembers] = useState([])
+  const [showColumnSettings, setShowColumnSettings] = useState(false)
   const [showNudges, setShowNudges] = useState(false)
   const [nudges, setNudges] = useState([])
   const [nudgesLoading, setNudgesLoading] = useState(false)
@@ -974,7 +1080,6 @@ export default function DemoPage() {
   const [dragOverStatus, setDragOverStatus] = useState(null)
   const cardElsRef = useRef(new Map())
   const prevRectsRef = useRef(new Map())
-  const taskInputRef = useRef(null)
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
 
@@ -1043,19 +1148,20 @@ export default function DemoPage() {
   }, [view, activeProjectId, selectedTaskId])
 
   /* ── persist ── */
-  useEffect(() => { if (projects.length) saveState({ projects, users, tasks, activeProjectId, view }) }, [projects, users, tasks, activeProjectId, view])
+  useEffect(() => { if (projects.length) saveState({ projects, users, teams, tasks, activeProjectId, view, settings }) }, [projects, users, teams, tasks, activeProjectId, view, settings])
 
   /* ── keyboard shortcuts ── */
   useEffect(() => {
     const fn = (e) => {
+      if (e.key === 'Escape') { if (showColumnSettings) { setShowColumnSettings(false); return } if (showCreateProject) { setShowCreateProject(false); return } if (showCreateTask) { setShowCreateTask(false); return } }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowCmdPalette((p) => !p); return }
       if (e.key === '?' && !e.metaKey && !e.ctrlKey) { setShowShortcuts((p) => !p); return }
-      if (e.key === 'n' || e.key === 'N') { if (view === NAV.board && taskInputRef.current) { e.preventDefault(); taskInputRef.current.focus() } }
+      if (e.key === 'n' || e.key === 'N') { if (view === NAV.board) { e.preventDefault(); openCreateTask() } }
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [view])
+  }, [view, showCreateProject, showCreateTask, showColumnSettings])
 
   /* ── AI nudges: auto-trigger on board load ── */
   const fetchAiNudges = useCallback(async (projectTasks, projectUsers, project) => {
@@ -1085,20 +1191,9 @@ export default function DemoPage() {
       nudgesFetchedRef.current = null
       return
     }
-    // Compute rule-based nudges immediately
+    // Compute rule-based nudges silently (don't auto-open panel)
     const ruleNudges = computeRuleNudges(tasks, users, activeProjectId)
     setNudges(ruleNudges)
-    setShowNudges(ruleNudges.length > 0)
-
-    // Fetch AI nudges only once per project switch
-    if (nudgesFetchedRef.current === activeProjectId) return
-    nudgesFetchedRef.current = activeProjectId
-    const proj = projects.find((p) => p.id === activeProjectId)
-    if (!proj) return
-    fetchAiNudges(tasks, users, proj).then((aiNudges) => {
-      setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiNudges])
-      if (aiNudges.length > 0) setShowNudges(true)
-    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, activeProjectId])
 
@@ -1106,17 +1201,33 @@ export default function DemoPage() {
     if (!activeProjectId) return
     const ruleNudges = computeRuleNudges(tasks, users, activeProjectId)
     setNudges(ruleNudges)
-    nudgesFetchedRef.current = null // allow re-fetch
+    // Only fetch AI nudges if within limit
+    if (getAiCallCount() >= AI_LIMIT) return
     const proj = projects.find((p) => p.id === activeProjectId)
     if (!proj) return
+    incAiCallCount()
     fetchAiNudges(tasks, users, proj).then((aiNudges) => {
       setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiNudges])
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, users, projects, activeProjectId, fetchAiNudges])
 
   const navigate = (nextView, projectId = null) => {
     setData((prev) => ({ ...prev, view: nextView, activeProjectId: projectId ?? prev.activeProjectId }))
+    if (nextView === NAV.board) setBoardView(settings.defaultView === 'list' ? BOARD_VIEWS.list : BOARD_VIEWS.kanban)
     setQuery(''); setTagQuery(''); setSelectedTaskId(null); setQuickFilter(null); setShowProjectComments(false)
+  }
+
+  const updateSettings = (patch) => setData((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }))
+  const toggleSidebar = () => updateSettings({ sidebarCollapsed: !sidebarCollapsed })
+
+  const visibleColumns = activeProject?.visibleColumns ?? STATUSES.map((s) => s.id)
+  const toggleColumn = (colId) => {
+    if (!activeProjectId) return
+    const current = activeProject?.visibleColumns ?? STATUSES.map((s) => s.id)
+    const next = current.includes(colId) ? current.filter((c) => c !== colId) : [...current, colId]
+    if (next.length === 0) return // must keep at least one
+    updateProject(activeProjectId, { visibleColumns: next })
   }
 
   /* ── filtered tasks ── */
@@ -1131,6 +1242,7 @@ export default function DemoPage() {
       if (quickFilter === 'mine' && !t.assigneeId) return false
       if (quickFilter === 'unassigned' && t.assigneeId) return false
       if (quickFilter === 'overdue' && (!isOverdue(t.dueDate) || t.status === 'done')) return false
+      if (quickFilter?.startsWith('team:') && t.assigneeId !== quickFilter.slice(5)) return false
       return true
     })
   }, [tasks, activeProjectId, nq, nt, quickFilter])
@@ -1158,15 +1270,15 @@ export default function DemoPage() {
   }, [tasks])
 
   /* ── actions ── */
-  const addProject = (e) => {
-    e.preventDefault()
-    const n = newProjectName.trim(); if (!n) return
-    const prefix = derivePrefix(n)
+  const openCreateProject = () => { setProjFormName(''); setProjFormPrefix(''); setShowCreateProject(true) }
+  const submitCreateProject = () => {
+    const n = projFormName.trim(); if (!n) return
+    const prefix = projFormPrefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || derivePrefix(n)
     setData((p) => ({ ...p, projects: [...p.projects, { id: uid(), name: n, prefix, taskCounter: 1, comments: [], createdAt: Date.now() }] }))
-    setNewProjectName('')
+    setShowCreateProject(false)
   }
   const addUser = (e) => { e.preventDefault(); const n = newUserName.trim(); if (!n) return; setData((p) => ({ ...p, users: [...p.users, { id: uid(), name: n, initials: initials(n), createdAt: Date.now() }] })); setNewUserName('') }
-  const removeUser = (userId) => setData((p) => ({ ...p, users: p.users.filter((u) => u.id !== userId), tasks: p.tasks.map((t) => t.assigneeId === userId ? { ...t, assigneeId: null } : t) }))
+  const removeUser = (userId) => setData((p) => ({ ...p, users: p.users.filter((u) => u.id !== userId), tasks: p.tasks.map((t) => t.assigneeId === userId ? { ...t, assigneeId: null } : t), teams: (p.teams ?? []).map((t) => ({ ...t, memberIds: t.memberIds.filter((id) => id !== userId) })) }))
   const deleteProject = (pid) => setData((p) => ({ ...p, projects: p.projects.filter((x) => x.id !== pid), tasks: p.tasks.filter((t) => t.projectId !== pid), activeProjectId: p.activeProjectId === pid ? null : p.activeProjectId, view: p.activeProjectId === pid ? NAV.projects : p.view }))
   const assignTask = (tid, aid) => setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === tid ? { ...t, assigneeId: aid } : t) }))
   const updateTask = (tid, u) => setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === tid ? { ...t, ...u } : t) }))
@@ -1180,9 +1292,13 @@ export default function DemoPage() {
     setEditingPrefix(false)
   }
 
-  const submitTask = () => {
-    const title = newTitle.trim(); if (!title || !activeProjectId) return
-    const tags = newTags.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 6)
+  const openCreateTask = () => {
+    setTaskFormTitle(''); setTaskFormDesc(''); setTaskFormPriority(''); setTaskFormStatus('inbox'); setTaskFormAssignee(''); setTaskFormTags(''); setTaskFormDueDate('')
+    setShowCreateTask(true)
+  }
+  const submitCreateTask = () => {
+    const title = taskFormTitle.trim(); if (!title || !activeProjectId) return
+    const tags = taskFormTags.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 6)
     const id = uid()
     setData((p) => {
       const proj = p.projects.find((x) => x.id === activeProjectId)
@@ -1190,13 +1306,13 @@ export default function DemoPage() {
       return {
         ...p,
         projects: p.projects.map((x) => x.id === activeProjectId ? { ...x, taskCounter: number + 1 } : x),
-        tasks: normalizeOrders([{ id, projectId: activeProjectId, number, title, description: '', tags, status: 'inbox', priority: null, dueDate: null, subtasks: [], comments: [], assigneeId: null, order: -1, createdAt: Date.now() }, ...p.tasks], activeProjectId),
+        tasks: normalizeOrders([{ id, projectId: activeProjectId, number, title, description: taskFormDesc.trim(), tags, status: taskFormStatus || 'inbox', priority: taskFormPriority || null, dueDate: taskFormDueDate || null, subtasks: [], comments: [], assigneeId: taskFormAssignee || null, order: -1, createdAt: Date.now() }, ...p.tasks], activeProjectId),
       }
     })
     setNewTaskIds((p) => new Set(p).add(id))
     if (newTaskTimerRef.current) clearTimeout(newTaskTimerRef.current)
     newTaskTimerRef.current = setTimeout(() => setNewTaskIds(new Set()), 400)
-    setNewTitle(''); setNewTags('')
+    setShowCreateTask(false)
   }
 
   /* ── task comments ── */
@@ -1229,15 +1345,46 @@ export default function DemoPage() {
     }))
   }
 
+  /* ── team actions ── */
+  const addTeam = (team) => setData((p) => ({ ...p, teams: [...(p.teams ?? []), { id: uid(), ...team, createdAt: Date.now() }] }))
+  const updateTeam = (tid, u) => setData((p) => ({ ...p, teams: (p.teams ?? []).map((t) => t.id === tid ? { ...t, ...u } : t) }))
+  const deleteTeam = (tid) => setData((p) => ({ ...p, teams: (p.teams ?? []).filter((t) => t.id !== tid), tasks: p.tasks.map((t) => t.assigneeId === tid ? { ...t, assigneeId: null } : t) }))
+
+  const openTeamForm = (teamId = 'new') => {
+    if (teamId === 'new') {
+      setTeamFormName(''); setTeamFormColor(TEAM_COLORS[0].id); setTeamFormMembers([])
+    } else {
+      const t = teams.find((x) => x.id === teamId)
+      if (t) { setTeamFormName(t.name); setTeamFormColor(t.color); setTeamFormMembers([...t.memberIds]) }
+    }
+    setEditingTeam(teamId)
+  }
+
+  const submitTeamForm = () => {
+    const name = teamFormName.trim()
+    if (!name) return
+    if (editingTeam === 'new') {
+      addTeam({ name, color: teamFormColor, memberIds: teamFormMembers })
+    } else if (editingTeam) {
+      updateTeam(editingTeam, { name, color: teamFormColor, memberIds: teamFormMembers })
+    }
+    setEditingTeam(null)
+  }
+
+  const toggleTeamMember = (userId) => {
+    setTeamFormMembers((prev) => prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId])
+  }
+
   /* ── AI project generation ── */
-  const AI_GEN_LIMIT_KEY = 'nudgeai_gen_count'
-  const getAiGenCount = () => { try { return parseInt(localStorage.getItem(AI_GEN_LIMIT_KEY) || '0') } catch { return 0 } }
-  const incAiGenCount = () => { try { localStorage.setItem(AI_GEN_LIMIT_KEY, String(getAiGenCount() + 1)) } catch { /* */ } }
+  const AI_LIMIT_KEY = 'nudgeai_ai_calls'
+  const AI_LIMIT = 5
+  const getAiCallCount = () => { try { return parseInt(localStorage.getItem(AI_LIMIT_KEY) || '0') } catch { return 0 } }
+  const incAiCallCount = () => { try { localStorage.setItem(AI_LIMIT_KEY, String(getAiCallCount() + 1)) } catch { /* */ } }
 
   const generateWithAi = async () => {
     const trimmed = aiPrompt.trim()
     if (!trimmed || aiLoading) return
-    if (getAiGenCount() >= 10) {
+    if (getAiCallCount() >= AI_LIMIT) {
       setAiError('You\'ve reached the generation limit for this session. Reset demo data to start fresh.')
       return
     }
@@ -1253,7 +1400,7 @@ export default function DemoPage() {
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Generation failed')
       setAiPreview(body)
-      incAiGenCount()
+      incAiCallCount()
     } catch (err) {
       setAiError(err.message || 'Something went wrong. Please try again.')
     } finally {
@@ -1311,55 +1458,84 @@ export default function DemoPage() {
   const onDragOverCol = (e, s) => { e.preventDefault(); setDragOverStatus(s) }
   const onDropTask = (e, s) => { e.preventDefault(); let id; try { id = e.dataTransfer.getData('text/plain') } catch { /* */ } const nid = id || draggingId; if (!nid) return; moveTask(nid, s, computeIdx(e.currentTarget.querySelector(`[data-column-list="${s}"]`) ?? e.currentTarget, e.clientY)); setDraggingId(null); setDragOverStatus(null) }
 
-  const resetDemo = () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* */ } setSelectedTaskId(null); const u = seedUsers(); const p = seedProjects(u); setData({ projects: p, users: u, tasks: seedTasks(p[0].id, p[1].id, u), activeProjectId: null, view: NAV.projects }) }
+  const resetDemo = () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* */ } setSelectedTaskId(null); const u = seedUsers(); const t = seedTeams(u); const p = seedProjects(u); setData({ projects: p, users: u, teams: t, tasks: seedTasks(p[0].id, p[1].id, u, t), activeProjectId: null, view: NAV.projects, settings: { ...DEFAULT_SETTINGS } }) }
 
   const projectStats = useMemo(() => { const m = {}; for (const p of projects) m[p.id] = { total: 0, done: 0 }; for (const t of tasks) { if (m[t.projectId]) { m[t.projectId].total++; if (t.status === 'done') m[t.projectId].done++ } } return m }, [projects, tasks])
 
   /* ═══ RENDER ═══ */
   return (
-    <div className="theme-light flex h-screen bg-[#f8f9fb] text-slate-900 overflow-hidden">
+    <div className={[settings.theme === 'dark' ? 'theme-dark' : 'theme-light', `density-${settings.density ?? 'comfortable'}`, 'demo-root flex h-screen overflow-hidden transition-colors duration-200'].join(' ')}>
       {/* SIDEBAR */}
-      <aside className="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-5">
-          <Link to="/" className="flex items-center gap-2.5"><img src="/favicon.png" alt="Nudge AI" className="h-7 w-7 rounded-md" /><span className="text-sm font-semibold tracking-tight text-slate-900">Nudge AI</span></Link>
-          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Demo</span>
+      <aside className={['flex shrink-0 flex-col border-r transition-all duration-200 sidebar-aside', sidebarCollapsed ? 'w-[56px]' : 'w-[240px]'].join(' ')}>
+        {/* logo */}
+        <div className={['flex h-14 items-center border-b sidebar-header', sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-5'].join(' ')}>
+          <Link to="/" className="flex items-center gap-2.5" title="Nudge AI">
+            <img src="/favicon.png" alt="Nudge AI" className="h-7 w-7 rounded-md shrink-0" />
+            {!sidebarCollapsed && <span className="text-sm font-semibold tracking-tight sidebar-text">Nudge AI</span>}
+          </Link>
+          {!sidebarCollapsed && <span className="ml-auto rounded-full sidebar-badge px-2 py-0.5 text-[10px] font-semibold">Demo</span>}
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-          <button type="button" onClick={() => navigate(NAV.projects)} className={['flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors', view === NAV.projects ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'].join(' ')}>
-            <IconFolder className="w-[18px] h-[18px]" />Projects<span className="ml-auto text-[11px] font-normal text-slate-400">{projects.length}</span>
+        <nav className={['flex-1 overflow-y-auto py-4 space-y-0.5', sidebarCollapsed ? 'px-1.5' : 'px-3'].join(' ')}>
+          {/* search */}
+          <button type="button" onClick={() => setShowCmdPalette(true)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors sidebar-item-muted', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'].join(' ')} title="Search (⌘K)">
+            <IconSearch className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <><span>Search</span><kbd className="ml-auto rounded sidebar-kbd px-1.5 py-0.5 text-[10px] font-semibold">⌘K</kbd></>}
           </button>
-          {projects.length > 0 && (
-            <div className="ml-4 border-l border-slate-100 pl-2 space-y-0.5">
+          <div className={['my-2 sidebar-divider', sidebarCollapsed ? 'mx-1' : ''].join(' ')} />
+          {/* projects */}
+          <button type="button" onClick={() => navigate(NAV.projects)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.projects ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Projects">
+            <IconFolder className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <span>Projects</span>}
+          </button>
+          {!sidebarCollapsed && projects.length > 0 && (
+            <div className="ml-4 border-l sidebar-sublist pl-2 space-y-0.5">
               {projects.map((p) => (
-                <button key={p.id} type="button" onClick={() => navigate(NAV.board, p.id)} className={['flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors truncate', view === NAV.board && activeProjectId === p.id ? 'bg-cyan-50 text-cyan-700 font-semibold' : 'text-slate-500 hover:bg-slate-50'].join(' ')}>
+                <button key={p.id} type="button" onClick={() => navigate(NAV.board, p.id)} className={['flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors truncate', view === NAV.board && activeProjectId === p.id ? 'sidebar-subitem-active' : 'sidebar-subitem'].join(' ')}>
                   <IconKanban className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{p.name}</span>
                 </button>
               ))}
             </div>
           )}
-          <button type="button" onClick={() => navigate(NAV.users)} className={['flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors', view === NAV.users ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'].join(' ')}>
-            <IconUsers className="w-[18px] h-[18px]" />Users<span className="ml-auto text-[11px] font-normal text-slate-400">{users.length}</span>
+          {/* users */}
+          <button type="button" onClick={() => navigate(NAV.users)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.users ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Users">
+            <IconUsers className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <span>Users</span>}
+          </button>
+          {/* teams */}
+          <button type="button" onClick={() => navigate(NAV.teams)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.teams ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Teams">
+            <IconTeam className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <span>Teams</span>}
+          </button>
+          {/* settings */}
+          <button type="button" onClick={() => navigate(NAV.settings)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.settings ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Settings">
+            <IconGear className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <span>Settings</span>}
           </button>
         </nav>
-        <div className="border-t border-slate-100 px-3 py-3 space-y-1">
-          <button type="button" onClick={() => setShowCmdPalette(true)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-colors"><IconCommand className="w-[18px] h-[18px]" />Search<kbd className="ml-auto rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">⌘K</kbd></button>
-          <button type="button" onClick={resetDemo} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-colors">Reset demo</button>
-          <Link to="/#waitlist" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-semibold text-cyan-600 hover:bg-cyan-50 transition-colors">Get early access</Link>
+        <div className={['border-t sidebar-footer space-y-1', sidebarCollapsed ? 'px-1.5 py-3' : 'px-3 py-3'].join(' ')}>
+          {!sidebarCollapsed && (
+            <>
+              <button type="button" onClick={resetDemo} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium sidebar-item-muted transition-colors">Reset demo</button>
+              <Link to="/#waitlist" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-semibold text-cyan-600 hover:bg-cyan-50 transition-colors">Get early access</Link>
+            </>
+          )}
+          <button type="button" onClick={toggleSidebar} className={['flex w-full items-center rounded-lg text-[13px] font-medium sidebar-item-muted transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'].join(' ')} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            {sidebarCollapsed ? <IconChevronRight className="w-[18px] h-[18px]" /> : <><IconChevronLeft className="w-[18px] h-[18px]" /><span>Collapse</span></>}
+          </button>
         </div>
       </aside>
 
       {/* MAIN */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto" style={{ background: 'var(--demo-bg)' }}>
         {/* PROJECTS */}
         {view === NAV.projects && (
           <div className="mx-auto max-w-4xl px-8 py-8">
-            <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-            <p className="mt-1 text-sm text-slate-500">Select a project to open its board.</p>
-            <form onSubmit={addProject} className="mt-6 flex items-center gap-3">
-              <input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="New project name…" className="flex-1 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm placeholder:text-slate-400 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30" />
-              <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />Create</button>
+            <h1 className="text-xl font-semibold tracking-tight demo-heading">Projects</h1>
+            <p className="mt-1 text-sm demo-muted">Select a project to open its board.</p>
+            <div className="mt-6 flex items-center gap-3">
+              <button type="button" onClick={openCreateProject} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />New project</button>
               <button type="button" onClick={() => setShowAiModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"><IconSparkle className="w-4 h-4" />Generate with AI</button>
-            </form>
+            </div>
             <div className="mt-6 space-y-2">
               {projects.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center"><IconFolder className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">No projects yet.</p></div>}
               {projects.map((p) => {
@@ -1386,8 +1562,8 @@ export default function DemoPage() {
         {/* USERS */}
         {view === NAV.users && (
           <div className="mx-auto max-w-3xl px-8 py-8">
-            <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-            <p className="mt-1 text-sm text-slate-500">Manage team members.</p>
+            <h1 className="text-xl font-semibold tracking-tight demo-heading">Users</h1>
+            <p className="mt-1 text-sm demo-muted">Manage team members.</p>
             <form onSubmit={addUser} className="mt-6 flex items-center gap-3">
               <input value={newUserName} onChange={(e) => setNewUserName(e.target.value)} placeholder="Full name…" className="flex-1 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm placeholder:text-slate-400 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30" />
               <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />Add user</button>
@@ -1408,10 +1584,166 @@ export default function DemoPage() {
           </div>
         )}
 
+        {/* TEAMS */}
+        {view === NAV.teams && (
+          <div className="mx-auto max-w-3xl px-8 py-8">
+            <h1 className="text-xl font-semibold tracking-tight demo-heading">Teams</h1>
+            <p className="mt-1 text-sm demo-muted">Create and manage teams. Assign teams to tasks and mention them in comments.</p>
+            <div className="mt-6">
+              <button type="button" onClick={() => openTeamForm('new')} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />Create team</button>
+            </div>
+
+            {/* team form modal */}
+            {editingTeam && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setEditingTeam(null) }}>
+                <div className="w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                    <h2 className="text-sm font-semibold">{editingTeam === 'new' ? 'Create Team' : 'Edit Team'}</h2>
+                    <button type="button" onClick={() => setEditingTeam(null)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+                  </div>
+                  <div className="px-6 py-5 space-y-5">
+                    {/* name */}
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Team name</label>
+                      <input value={teamFormName} onChange={(e) => setTeamFormName(e.target.value)} placeholder="e.g. Engineering" className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30" autoFocus />
+                    </div>
+                    {/* color */}
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</label>
+                      <div className="mt-2 flex gap-2">
+                        {TEAM_COLORS.map((c) => (
+                          <button key={c.id} type="button" onClick={() => setTeamFormColor(c.id)} className={['h-8 w-8 rounded-full transition-all', c.dot, teamFormColor === c.id ? 'ring-2 ring-offset-2 ring-slate-900 scale-110' : 'hover:scale-105'].join(' ')} aria-label={c.id} />
+                        ))}
+                      </div>
+                    </div>
+                    {/* members */}
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Members</label>
+                      <div className="mt-2 space-y-1">
+                        {users.length === 0 && <p className="text-xs text-slate-400 py-2">No users yet. Add users first.</p>}
+                        {users.map((u) => (
+                          <button key={u.id} type="button" onClick={() => toggleTeamMember(u.id)} className={['flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors', teamFormMembers.includes(u.id) ? 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>
+                            <Avatar name={u.name} size="sm" />
+                            <span className="flex-1 text-left">{u.name}</span>
+                            {teamFormMembers.includes(u.id) && <IconCheck className="w-4 h-4 text-cyan-600" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
+                    <button type="button" onClick={() => setEditingTeam(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+                    <button type="button" onClick={submitTeamForm} disabled={!teamFormName.trim()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">{editingTeam === 'new' ? 'Create' : 'Save'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* teams list */}
+            <div className="mt-6 space-y-2">
+              {teams.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center"><IconTeam className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">No teams yet. Create one to get started.</p></div>}
+              {teams.map((team) => {
+                const tc = TEAM_COLORS.find((c) => c.id === team.color) ?? TEAM_COLORS[0]
+                const members = users.filter((u) => team.memberIds.includes(u.id))
+                const taskCount = tasks.filter((t) => t.assigneeId === team.id).length
+                return (
+                  <div key={team.id} className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                    <div className={['grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1', tc.bg, tc.ring].join(' ')}>
+                      <span className={['h-3 w-3 rounded-full', tc.dot].join(' ')} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{team.name}</span>
+                        <span className={['rounded-md px-2 py-0.5 text-[10px] font-semibold', tc.pill].join(' ')}>{members.length} member{members.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        {members.length > 0 ? (
+                          <div className="flex -space-x-1.5">
+                            {members.slice(0, 5).map((u) => <Avatar key={u.id} name={u.name} size="sm" />)}
+                            {members.length > 5 && <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500 ring-1 ring-white">+{members.length - 5}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-slate-400">No members</span>
+                        )}
+                        <span className="text-[12px] text-slate-400 ml-2">{taskCount} task{taskCount !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => openTeamForm(team.id)} className="shrink-0 rounded-md p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-100 hover:text-slate-600 transition-all" aria-label="Edit team"><IconPencil className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => deleteTeam(team.id)} className="shrink-0 rounded-md px-2 py-1 text-[11px] text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all">Delete</button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {view === NAV.settings && (
+          <div className="mx-auto max-w-2xl px-8 py-8">
+            <h1 className="text-xl font-semibold tracking-tight demo-heading">Settings</h1>
+            <p className="mt-1 text-sm demo-muted">Customize your dashboard experience.</p>
+
+            {/* theme */}
+            <div className="mt-8">
+              <h2 className="text-sm font-semibold demo-heading">Theme</h2>
+              <p className="mt-0.5 text-[12px] demo-muted">Switch between light and dark mode.</p>
+              <div className="mt-3 flex gap-3">
+                {[{ id: 'light', label: 'Light', Icon: IconSun }, { id: 'dark', label: 'Dark', Icon: IconMoon }].map(({ id, label, Icon }) => (
+                  <button key={id} type="button" onClick={() => updateSettings({ theme: id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.theme === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                    <Icon className="w-4 h-4" />{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* layout prefs */}
+            <div className="mt-8">
+              <h2 className="text-sm font-semibold demo-heading">Layout</h2>
+              <p className="mt-0.5 text-[12px] demo-muted">Set your preferred defaults.</p>
+              <div className="mt-3 space-y-4">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider demo-muted">Default board view</label>
+                  <div className="mt-2 flex gap-3">
+                    {[{ id: 'kanban', label: 'Board', Icon: IconKanban }, { id: 'list', label: 'List', Icon: IconList }].map(({ id, label, Icon }) => (
+                      <button key={id} type="button" onClick={() => updateSettings({ defaultView: id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.defaultView === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                        <Icon className="w-4 h-4" />{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider demo-muted">Sidebar default</label>
+                  <div className="mt-2 flex gap-3">
+                    {[{ id: false, label: 'Expanded' }, { id: true, label: 'Collapsed' }].map(({ id, label }) => (
+                      <button key={String(id)} type="button" onClick={() => updateSettings({ sidebarCollapsed: id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.sidebarCollapsed === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                        {id ? <IconChevronRight className="w-4 h-4" /> : <IconChevronLeft className="w-4 h-4" />}{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* density */}
+            <div className="mt-8">
+              <h2 className="text-sm font-semibold demo-heading">Display density</h2>
+              <p className="mt-0.5 text-[12px] demo-muted">Control spacing and sizing of task cards and list rows.</p>
+              <div className="mt-3 flex gap-3">
+                {[{ id: 'compact', label: 'Compact', desc: 'Tighter spacing' }, { id: 'comfortable', label: 'Comfortable', desc: 'Default spacing' }, { id: 'spacious', label: 'Spacious', desc: 'More breathing room' }].map(({ id, label, desc }) => (
+                  <button key={id} type="button" onClick={() => updateSettings({ density: id })} className={['flex flex-col items-start rounded-xl border px-5 py-3 text-left transition-all', settings.density === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                    <span className="text-sm font-medium">{label}</span>
+                    <span className="text-[11px] demo-muted mt-0.5">{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* BOARD */}
         {view === NAV.board && (
           <div className="flex h-full flex-col">
-            <div className="shrink-0 border-b border-slate-200 bg-white px-8 py-4 space-y-3">
+            <div className="shrink-0 border-b px-8 py-4 space-y-3" style={{ borderColor: 'var(--demo-border)', background: 'var(--demo-surface)' }}>
               {/* row 1: nav + title + prefix + view toggle */}
               <div className="flex items-center gap-4">
                 <button type="button" onClick={() => navigate(NAV.projects)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"><IconArrowLeft className="w-3.5 h-3.5" />Back</button>
@@ -1432,10 +1764,32 @@ export default function DemoPage() {
                   {(activeProject?.comments ?? []).length > 0 && <span>{(activeProject?.comments ?? []).length}</span>}
                 </button>
                 {/* nudges toggle */}
-                <button type="button" onClick={() => setShowNudges((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors relative', showNudges ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="AI Nudges">
+                <button type="button" onClick={() => { setShowNudges((p) => { if (!p) { /* opening — fetch AI nudges if not yet fetched for this project */ if (nudgesFetchedRef.current !== activeProjectId && getAiCallCount() < AI_LIMIT) { nudgesFetchedRef.current = activeProjectId; incAiCallCount(); const proj = projects.find((x) => x.id === activeProjectId); if (proj) fetchAiNudges(tasks, users, proj).then((aiN) => setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiN])) } } return !p }) }} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors relative', showNudges ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="AI Nudges">
                   <IconSparkle className="w-3.5 h-3.5" />
                   {nudges.length > 0 && <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-violet-500 text-[10px] font-bold text-white px-1">{nudges.length}</span>}
                 </button>
+                {/* column visibility */}
+                <div className="relative">
+                  <button type="button" onClick={() => setShowColumnSettings((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', showColumnSettings ? 'bg-slate-100 text-slate-900 border border-slate-300' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="Column visibility">
+                    <IconEye className="w-3.5 h-3.5" />
+                  </button>
+                  {showColumnSettings && (
+                    <div className="absolute right-0 top-full mt-1 z-30 w-52 rounded-xl border shadow-lg p-2 space-y-0.5" style={{ background: 'var(--demo-surface)', borderColor: 'var(--demo-border)' }}>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider demo-muted">Visible columns</div>
+                      {STATUSES.map((s) => {
+                        const active = visibleColumns.includes(s.id)
+                        const isLast = visibleColumns.length === 1 && active
+                        return (
+                          <button key={s.id} type="button" onClick={() => !isLast && toggleColumn(s.id)} className={['flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-colors', isLast ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'].join(' ')} disabled={isLast} style={isLast ? {} : {}}>
+                            <span className={['h-2.5 w-2.5 rounded-full shrink-0', s.dot].join(' ')} />
+                            <span className="flex-1 text-left text-[13px]" style={{ color: 'var(--demo-text-secondary)' }}>{s.label}</span>
+                            {active ? <IconEye className="w-3.5 h-3.5" style={{ color: 'var(--demo-text-muted)' }} /> : <IconEyeOff className="w-3.5 h-3.5" style={{ color: 'var(--demo-text-muted)' }} />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
                 {/* view toggle */}
                 <div className="hidden sm:flex items-center rounded-lg border border-slate-200 p-0.5">
                   <button type="button" onClick={() => setBoardView(BOARD_VIEWS.kanban)} className={['rounded-md px-2.5 py-1 text-xs font-medium transition-colors', boardView === BOARD_VIEWS.kanban ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'].join(' ')}><IconKanban className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Board</button>
@@ -1447,19 +1801,15 @@ export default function DemoPage() {
               {showProjectComments && activeProject && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3 animate-[slideUp_150ms_ease-out]">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Project Comments</div>
-                  <CommentList comments={activeProject.comments ?? []} users={users} onDelete={(cid) => deleteProjectComment(activeProject.id, cid)} />
-                  <CommentInput users={users} onSubmit={(text) => addProjectComment(activeProject.id, text)} />
+                  <CommentList comments={activeProject.comments ?? []} users={users} teams={teams} onDelete={(cid) => deleteProjectComment(activeProject.id, cid)} />
+                  <CommentInput users={users} teams={teams} onSubmit={(text) => addProjectComment(activeProject.id, text)} />
                 </div>
               )}
 
               {/* row 2: add task + search */}
               <div className="flex items-center gap-6">
-                <form onSubmit={(e) => { e.preventDefault(); submitTask() }} className="flex flex-1 items-center gap-2">
-                  <input ref={taskInputRef} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitTask() } }} placeholder="New task… (press N)" className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-[#f8f9fb] px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
-                  <input value={newTags} onChange={(e) => setNewTags(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitTask() } }} placeholder="Tags…" className="hidden md:block w-28 rounded-lg border border-slate-200 bg-[#f8f9fb] px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
-                  <button type="submit" className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-3.5 h-3.5" />Add</button>
-                </form>
-                <div className="hidden sm:block h-6 w-px bg-slate-200" />
+                <button type="button" onClick={openCreateTask} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-3.5 h-3.5" />New task</button>
+                <div className="flex-1" />
                 <div className="hidden sm:flex items-center gap-2">
                   <div className="relative">
                     <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
@@ -1474,6 +1824,12 @@ export default function DemoPage() {
                   {[{ key: null, label: 'All' }, { key: 'mine', label: 'Assigned' }, { key: 'unassigned', label: 'Unassigned' }, { key: 'overdue', label: 'Overdue' }].map((f) => (
                     <button key={f.key ?? 'all'} type="button" onClick={() => setQuickFilter(f.key)} className={['rounded-full px-3 py-1 text-[11px] font-medium transition-colors', quickFilter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'].join(' ')}>{f.label}</button>
                   ))}
+                  {teams.length > 0 && <span className="h-4 w-px bg-slate-200" />}
+                  {teams.map((t) => {
+                    const tc = TEAM_COLORS.find((c) => c.id === t.color) ?? TEAM_COLORS[0]
+                    const fKey = `team:${t.id}`
+                    return <button key={fKey} type="button" onClick={() => setQuickFilter(quickFilter === fKey ? null : fKey)} className={['rounded-full px-3 py-1 text-[11px] font-medium transition-colors inline-flex items-center gap-1', quickFilter === fKey ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'].join(' ')}><span className={['h-1.5 w-1.5 rounded-full', quickFilter === fKey ? 'bg-white' : tc.dot].join(' ')} />{t.name}</button>
+                  })}
                 </div>
                 <div className="flex-1" />
                 <BoardStats tasks={tasks} activeProjectId={activeProjectId} />
@@ -1484,10 +1840,10 @@ export default function DemoPage() {
             {boardView === BOARD_VIEWS.kanban ? (
               <div className="flex-1 overflow-x-auto overflow-y-auto px-8 py-6">
                 <div className="flex gap-5 h-full">
-                  {STATUSES.map((s) => (
+                  {STATUSES.filter((s) => visibleColumns.includes(s.id)).map((s) => (
                     <Column key={s.id} title={s.label} dot={s.dot} status={s.id} count={(byStatus[s.id] ?? []).length} isDropActive={dragOverStatus === s.id} onDropTask={onDropTask} onDragOverColumn={onDragOverCol}>
                       {(byStatus[s.id] ?? []).map((t) => (
-                        <TaskCard key={t.id} task={t} project={activeProject} users={users} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} />
+                        <TaskCard key={t.id} task={t} project={activeProject} users={users} teams={teams} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} />
                       ))}
                     </Column>
                   ))}
@@ -1495,7 +1851,7 @@ export default function DemoPage() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">
-                <ListView tasks={filtered} projects={projects} users={users} onSelect={setSelectedTaskId} />
+                <ListView tasks={filtered.filter((t) => visibleColumns.includes(t.status))} projects={projects} users={users} teams={teams} onSelect={setSelectedTaskId} />
               </div>
             )}
           </div>
@@ -1509,6 +1865,7 @@ export default function DemoPage() {
           task={selectedTask}
           project={projects.find((p) => p.id === selectedTask.projectId)}
           users={users}
+          teams={teams}
           onClose={() => setSelectedTaskId(null)}
           onUpdate={updateTask}
           onDelete={deleteTask}
@@ -1525,8 +1882,115 @@ export default function DemoPage() {
           onRefresh={refreshNudges}
         />
       )}
-      {showCmdPalette && <CommandPalette tasks={tasks} projects={projects} users={users} onClose={() => setShowCmdPalette(false)} onSelectTask={(id, projectId) => { setData((prev) => ({ ...prev, view: NAV.board, activeProjectId: projectId })); setSelectedTaskId(id) }} onNavigate={navigate} />}
+      {showCmdPalette && <CommandPalette tasks={tasks} projects={projects} users={users} teams={teams} onClose={() => setShowCmdPalette(false)} onSelectTask={(id, projectId) => { setData((prev) => ({ ...prev, view: NAV.board, activeProjectId: projectId })); setSelectedTaskId(id) }} onNavigate={navigate} />}
       {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
+
+      {/* Create Project Modal */}
+      {showCreateProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowCreateProject(false) }}>
+          <div className="w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600"><IconFolder className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold">New Project</h2>
+                  <p className="text-[11px] text-slate-500">Create a new project to organize your tasks</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowCreateProject(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Project name <span className="text-red-400">*</span></label>
+                <input value={projFormName} onChange={(e) => setProjFormName(e.target.value)} placeholder="e.g. Mobile App Redesign" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') submitCreateProject() }} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Prefix <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">(auto-derived if empty)</span></label>
+                <input value={projFormPrefix} onChange={(e) => setProjFormPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} placeholder="e.g. MAR" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-mono placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" onKeyDown={(e) => { if (e.key === 'Enter') submitCreateProject() }} />
+                <p className="mt-1 text-[11px] text-slate-400">Used for task IDs, e.g. {projFormPrefix.trim() || (projFormName.trim() ? derivePrefix(projFormName) : 'PRJ')}-1</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 bg-slate-50/50">
+              <button type="button" onClick={() => setShowCreateProject(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+              <button type="button" onClick={submitCreateProject} disabled={!projFormName.trim()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Create project</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal */}
+      {showCreateTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowCreateTask(false) }}>
+          <div className="w-full max-w-lg mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600"><IconPlus className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold">New Task</h2>
+                  <p className="text-[11px] text-slate-500">Add a task to <span className="font-medium text-slate-700">{activeProject?.name ?? 'project'}</span></p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowCreateTask(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {/* title */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Title <span className="text-red-400">*</span></label>
+                <input value={taskFormTitle} onChange={(e) => setTaskFormTitle(e.target.value)} placeholder="What needs to be done?" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" autoFocus />
+              </div>
+              {/* description */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</label>
+                <textarea value={taskFormDesc} onChange={(e) => setTaskFormDesc(e.target.value)} placeholder="Add more details…" rows={3} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
+              </div>
+              {/* status + priority row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</label>
+                  <select value={taskFormStatus} onChange={(e) => setTaskFormStatus(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors appearance-none cursor-pointer">
+                    {STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Priority</label>
+                  <select value={taskFormPriority} onChange={(e) => setTaskFormPriority(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors appearance-none cursor-pointer">
+                    <option value="">None</option>
+                    {PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.short} – {p.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* assignee + due date row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Assignee</label>
+                  <select value={taskFormAssignee} onChange={(e) => setTaskFormAssignee(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors appearance-none cursor-pointer">
+                    <option value="">Unassigned</option>
+                    <optgroup label="Users">
+                      {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </optgroup>
+                    {teams.length > 0 && <optgroup label="Teams">
+                      {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </optgroup>}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Due date</label>
+                  <input type="date" value={taskFormDueDate} onChange={(e) => setTaskFormDueDate(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
+                </div>
+              </div>
+              {/* tags */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tags <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">(comma-separated, max 6)</span></label>
+                <input value={taskFormTags} onChange={(e) => setTaskFormTags(e.target.value)} placeholder="e.g. frontend, bug, urgent" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 bg-slate-50/50">
+              <button type="button" onClick={() => setShowCreateTask(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+              <button type="button" onClick={submitCreateTask} disabled={!taskFormTitle.trim()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Create task</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Generate Modal */}
       {showAiModal && (
@@ -1647,7 +2111,7 @@ export default function DemoPage() {
             <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 bg-slate-50/50">
               {!aiPreview ? (
                 <>
-                  <div className="text-[11px] text-slate-400">{10 - getAiGenCount()} generations remaining</div>
+                  <div className="text-[11px] text-slate-400">{AI_LIMIT - getAiCallCount()} AI calls remaining</div>
                   <button
                     type="button"
                     onClick={generateWithAi}
