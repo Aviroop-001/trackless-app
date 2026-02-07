@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 /* ───────────────────────── constants ───────────────────────── */
 
-const STORAGE_KEY = 'trackless_demo_v4'
+const STORAGE_KEY = 'nudgeai_demo_v4'
 
 const STATUSES = [
   { id: 'inbox', label: 'Inbox', dot: 'bg-slate-400' },
@@ -1230,7 +1230,7 @@ export default function DemoPage() {
   }
 
   /* ── AI project generation ── */
-  const AI_GEN_LIMIT_KEY = 'trackless_ai_gen_count'
+  const AI_GEN_LIMIT_KEY = 'nudgeai_gen_count'
   const getAiGenCount = () => { try { return parseInt(localStorage.getItem(AI_GEN_LIMIT_KEY) || '0') } catch { return 0 } }
   const incAiGenCount = () => { try { localStorage.setItem(AI_GEN_LIMIT_KEY, String(getAiGenCount() + 1)) } catch { /* */ } }
 
@@ -1321,7 +1321,7 @@ export default function DemoPage() {
       {/* SIDEBAR */}
       <aside className="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-5">
-          <Link to="/" className="flex items-center gap-2.5"><div className="grid h-7 w-7 place-items-center rounded-md bg-slate-900 text-white"><span className="text-[11px] font-bold tracking-tight">T</span></div><span className="text-sm font-semibold tracking-tight text-slate-900">Trackless</span></Link>
+          <Link to="/" className="flex items-center gap-2.5"><div className="grid h-7 w-7 place-items-center rounded-md bg-linear-to-br from-violet-600 to-cyan-500 text-white"><span className="text-[11px] font-bold tracking-tight">N</span></div><span className="text-sm font-semibold tracking-tight text-slate-900">Nudge AI</span></Link>
           <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Demo</span>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">

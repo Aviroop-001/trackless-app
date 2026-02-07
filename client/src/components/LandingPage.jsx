@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import SiteHeader from './SiteHeader.jsx'
 import WaitlistForm from './WaitlistForm.jsx'
 
-const PRODUCT = 'Trackless'
+const PRODUCT = 'Nudge AI'
 
 /* ═══════════════════════════════════════════════════════════════
    SCROLL-DRIVEN SECTION — fades + translates in on scroll
@@ -224,7 +224,7 @@ const COMPARE = [
   { area: 'Capture', old: 'Forms, required fields, metadata first.', neu: 'Inbox-first. Type → enter. Done.' },
   { area: 'Organize', old: 'Rigid projects & boards force process early.', neu: 'Optional tags + views only when it matters.' },
   { area: 'Ship', old: 'Status meetings & manual updates.', neu: 'Simple states. Momentum stays visible.' },
-  { area: 'AI', old: 'Bolted-on copilots nobody asked for.', neu: 'Nudge: auto-tag, detect duplicates, draft updates.' },
+  { area: 'AI', old: 'Bolted-on copilots nobody asked for.', neu: 'Smart nudges that watch your board and tell you what needs attention.' },
 ]
 
 /* ═══════════════════════════════════════════════════════════════
@@ -232,10 +232,10 @@ const COMPARE = [
    ═══════════════════════════════════════════════════════════════ */
 
 const FAQ = [
-  { q: 'Is this trying to replace every JIRA feature?', a: 'No. We replace the 20% of JIRA that 80% of teams actually use—task capture, lightweight organization, and shipping visibility—without the bloat.' },
-  { q: 'Can I track non-engineering work too?', a: 'Absolutely. Trackless is intentionally generic. Marketing campaigns, hiring pipelines, personal to-dos—if it\'s work, it fits.' },
-  { q: 'Do you support projects/boards?', a: 'Yes. Projects with Kanban boards, optional tags, search and filtering. Try the live demo.' },
-  { q: 'When can I try it?', a: 'The interactive demo is live right now. Full product access rolls out to waitlist members first.' },
+  { q: 'Is this trying to replace every JIRA feature?', a: 'No. We replace the 20% of JIRA that 80% of teams actually use—task capture, lightweight organization, and shipping visibility—with AI that actively helps you manage, not just track.' },
+  { q: 'Can I track non-engineering work too?', a: 'Absolutely. Nudge AI is intentionally generic. Marketing campaigns, hiring pipelines, personal to-dos—if it\'s work, it fits.' },
+  { q: 'What makes the AI different from other tools?', a: 'Most tools bolt on AI as a chatbot. Nudge AI watches your board and proactively tells you what needs attention—overdue tasks, stuck work, workload imbalance. It\'s like having a PM on your team.' },
+  { q: 'When can I try it?', a: 'The interactive demo is live right now—including AI project generation and smart nudges. Full product access rolls out to waitlist members first.' },
 ]
 
 /* ═══════════════════════════════════════════════════════════════
@@ -258,22 +258,22 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <ScrollSection>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-400/80">
-              The JIRA alternative for people who hate tools
+              The AI-powered project tracker that manages alongside you
             </p>
           </ScrollSection>
 
           <ScrollSection delay={120}>
             <h1 className="mt-6 text-5xl font-bold tracking-tight text-white sm:text-7xl lg:text-8xl leading-[1.05]">
-              Track everything.
+              Don't just track.
               <br />
-              <span className="text-white/40">Ship faster.</span>
+              <span className="text-white/40">Get nudged.</span>
             </h1>
           </ScrollSection>
 
           <ScrollSection delay={250}>
             <p className="mx-auto mt-8 max-w-lg text-lg leading-relaxed text-white/50">
-              Dead-simple task tracking that stays out of your way.
-              No setup. No ceremony. Just capture, organize, and ship.
+              AI-powered task tracking that actively manages alongside you.
+              Smart nudges, auto-generated plans, and zero busywork.
             </p>
           </ScrollSection>
 

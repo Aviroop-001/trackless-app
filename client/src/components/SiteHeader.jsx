@@ -10,7 +10,7 @@ function LogoMark({ className = '' }) {
       ].join(' ')}
       aria-hidden="true"
     >
-      <span className="text-sm font-semibold tracking-tight">T</span>
+      <span className="text-sm font-semibold tracking-tight">N</span>
     </div>
   )
 }
@@ -27,7 +27,7 @@ function ArrowRightIcon({ className = '' }) {
   )
 }
 
-export default function SiteHeader({ productName = 'Trackless' }) {
+export default function SiteHeader({ productName = 'Nudge AI' }) {
   const { pathname } = useLocation()
   const isHome = pathname === '/'
 

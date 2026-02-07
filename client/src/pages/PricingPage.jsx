@@ -82,7 +82,7 @@ export default function PricingPage() {
         aria-hidden="true"
       />
 
-      <SiteHeader productName="Trackless" />
+      <SiteHeader productName="Nudge AI" />
 
       <main className="container-page pt-12 pb-20 sm:pt-16 sm:pb-24">
         <Reveal className="mx-auto max-w-2xl text-center">
