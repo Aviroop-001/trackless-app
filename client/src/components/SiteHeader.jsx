@@ -2,11 +2,26 @@ import { Link, useLocation } from 'react-router-dom'
 
 function LogoMark({ className = '' }) {
   return (
-    <img
-      src="/favicon.png"
-      alt="Nudge AI"
-      className={['h-9 w-9 rounded-xl', className].join(' ')}
-    />
+    <div
+      className={[
+        'grid h-9 w-9 place-items-center rounded-xl',
+        'bg-white/10 ring-1 ring-white/15 backdrop-blur-sm',
+        className,
+      ].join(' ')}
+      aria-hidden="true"
+    >
+      {/* double chevron matching the logo */}
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+        <path d="M7 7l5 5-5 5" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13 7l5 5-5 5" stroke="url(#logoGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <defs>
+          <linearGradient id="logoGrad" x1="13" y1="7" x2="18" y2="17" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#8b5cf6" />
+            <stop offset="1" stopColor="#22d3ee" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
   )
 }
 

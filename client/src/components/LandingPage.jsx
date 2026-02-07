@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import SiteHeader from './SiteHeader.jsx'
 import WaitlistForm from './WaitlistForm.jsx'
@@ -49,6 +49,84 @@ function ScrollSection({ children, className = '', delay = 0 }) {
     >
       {children}
     </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FLOATING DOT NAV — tiny dots on the right edge, labels on hover
+   ═══════════════════════════════════════════════════════════════ */
+
+const SECTIONS = [
+  { id: 'top', label: 'Home' },
+  { id: 'how', label: 'How it works' },
+  { id: 'ai', label: 'AI Features' },
+  { id: 'audience', label: 'Who it\'s for' },
+  { id: 'features', label: 'Comparison' },
+  { id: 'preview', label: 'Preview' },
+  { id: 'faq', label: 'FAQ' },
+  { id: 'founder', label: 'Built by' },
+  { id: 'waitlist', label: 'Waitlist' },
+]
+
+function FloatingNav() {
+  const [active, setActive] = useState('top')
+
+  useEffect(() => {
+    const els = SECTIONS.map(s => document.getElementById(s.id)).filter(Boolean)
+    if (!els.length) return
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActive(entry.target.id)
+          }
+        }
+      },
+      { rootMargin: '-40% 0px -55% 0px' }
+    )
+
+    els.forEach(el => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
+  return (
+    <nav className="fixed right-4 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col items-end gap-3">
+      {SECTIONS.map((s) => (
+        <a
+          key={s.id}
+          href={`#${s.id}`}
+          className="group flex items-center gap-2.5"
+          onClick={(e) => {
+            e.preventDefault()
+            document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth' })
+          }}
+        >
+          {/* label — hidden by default, slides in on hover */}
+          <span
+            className={[
+              'rounded-full px-2.5 py-1 text-[10px] font-medium tracking-wide transition-all duration-200',
+              'opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0',
+              active === s.id
+                ? 'bg-cyan-400/15 text-cyan-300 border border-cyan-400/25'
+                : 'bg-white/8 text-white/50 border border-white/10',
+            ].join(' ')}
+          >
+            {s.label}
+          </span>
+
+          {/* dot */}
+          <span
+            className={[
+              'block rounded-full transition-all duration-300',
+              active === s.id
+                ? 'h-2.5 w-2.5 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                : 'h-1.5 w-1.5 bg-white/25 group-hover:bg-white/50',
+            ].join(' ')}
+          />
+        </a>
+      ))}
+    </nav>
   )
 }
 
@@ -244,7 +322,15 @@ const FAQ = [
 
 export default function LandingPage() {
   return (
-    <div className="theme-dark">
+    <div className="theme-dark relative">
+      {/* persistent animated background */}
+      <div className="fixed inset-0 z-0" aria-hidden="true">
+        <HeroCanvas />
+      </div>
+
+      <FloatingNav />
+
+      <div className="relative z-10">
       <SiteHeader productName={PRODUCT} />
 
       {/* ═══ HERO ═══ */}
@@ -253,7 +339,6 @@ export default function LandingPage() {
         className="relative flex min-h-screen items-center justify-center overflow-hidden"
         style={{ isolation: 'isolate' }}
       >
-        <HeroCanvas />
 
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <ScrollSection>
@@ -339,6 +424,152 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══ AI CAPABILITIES ═══ */}
+      <section id="ai" className="relative py-32 scroll-mt-20">
+        <div className="mx-auto max-w-5xl px-6">
+          <ScrollSection>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-400/80 text-center">
+              Built-in AI
+            </p>
+            <h2 className="mt-4 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              AI that manages, not just tracks.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-center text-base text-white/40">
+              Most tools bolt on AI as a chatbot. Nudge AI bakes intelligence into every layer of your workflow.
+            </p>
+          </ScrollSection>
+
+          <div className="mt-20 grid gap-8 md:grid-cols-3">
+            {[
+              {
+                icon: (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" /></svg>
+                ),
+                title: 'Smart Nudges',
+                desc: 'Your board is watched 24/7. Overdue tasks, stuck work, workload imbalance—Nudge AI spots issues before they become blockers and tells you exactly what needs attention.',
+                accent: 'from-violet-500 to-violet-600',
+                examples: ['"Fix auth redirect" is 2 days overdue', '"Write API docs" has been in progress for 5 days. Stuck?', 'Sam has 5 tasks while Riya has 1. Rebalance?'],
+              },
+              {
+                icon: (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+                ),
+                title: 'AI Project Generation',
+                desc: 'Describe what you\'re building in plain English. Nudge AI creates a full project with structured tasks, priorities, subtasks, and tags—in under 2 seconds.',
+                accent: 'from-cyan-500 to-cyan-600',
+                examples: ['"Build an employee onboarding tool"', '→ 8 tasks with subtasks, priorities & tags', '→ Ready to start working immediately'],
+              },
+              {
+                icon: (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>
+                ),
+                title: 'AI Insights',
+                desc: 'Get strategic suggestions based on your board\'s health. Nudge AI analyzes task distribution, velocity, and patterns to give you advice a senior PM would.',
+                accent: 'from-emerald-500 to-emerald-600',
+                examples: ['Batch auth-related tasks into a focused sprint', 'Backlog is growing faster than throughput', 'Consider splitting large tasks into smaller pieces'],
+              },
+            ].map((feat, i) => (
+              <ScrollSection key={feat.title} delay={i * 120}>
+                <div className="group rounded-2xl border border-white/8 bg-white/[0.03] p-6 transition hover:border-white/15 hover:bg-white/[0.05]">
+                  <div className={`inline-flex items-center justify-center h-12 w-12 rounded-xl bg-gradient-to-br ${feat.accent} text-white shadow-lg`}>
+                    {feat.icon}
+                  </div>
+                  <h3 className="mt-5 text-xl font-bold text-white">{feat.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/50">{feat.desc}</p>
+
+                  {/* example nudges/outputs */}
+                  <div className="mt-5 space-y-2">
+                    {feat.examples.map((ex, j) => (
+                      <div key={j} className="flex items-start gap-2.5 rounded-lg bg-white/[0.04] border border-white/6 px-3.5 py-2.5">
+                        <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                        <span className="text-[13px] text-white/60 leading-snug">{ex}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </ScrollSection>
+            ))}
+          </div>
+
+          <ScrollSection delay={400}>
+            <div className="mt-16 text-center">
+              <Link
+                to="/demo"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10 hover:border-white/25 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+              >
+                Try AI features in the demo
+                <svg className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+              </Link>
+            </div>
+          </ScrollSection>
+        </div>
+      </section>
+
+      {/* ═══ WHO IT'S FOR ═══ */}
+      <section id="audience" className="relative py-32 scroll-mt-20">
+        <div className="mx-auto max-w-5xl px-6">
+          <ScrollSection>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-400/80 text-center">
+              Who it's for
+            </p>
+            <h2 className="mt-4 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              Built for teams that ship, not teams that plan to plan.
+            </h2>
+          </ScrollSection>
+
+          <div className="mt-16 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" /></svg>,
+                title: 'Startup founders',
+                desc: 'Stop configuring tools. Start shipping your MVP. Nudge AI gives you structure without ceremony—so you focus on what matters.',
+              },
+              {
+                icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" /></svg>,
+                title: 'Small dev teams (2-10)',
+                desc: 'All the structure you need, none of the bloat. Your team gets Kanban boards, smart nudges, and AI insights without a 3-day JIRA setup.',
+              },
+              {
+                icon: <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>,
+                title: 'Solo builders',
+                desc: 'Your personal PM that never sleeps. Describe what you\'re building, get a structured plan in seconds, and let AI keep you on track.',
+              },
+            ].map((p, i) => (
+              <ScrollSection key={p.title} delay={i * 100}>
+                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-6 text-center transition hover:border-white/15 hover:bg-white/[0.05]">
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10 text-cyan-400">
+                    {p.icon}
+                  </div>
+                  <h3 className="mt-5 text-lg font-bold text-white">{p.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/50">{p.desc}</p>
+                </div>
+              </ScrollSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ TRUST SIGNALS ═══ */}
+      <section className="relative py-16">
+        <div className="mx-auto max-w-4xl px-6">
+          <ScrollSection>
+            <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+              {[
+                { icon: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>, text: 'No credit card required' },
+                { icon: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>, text: 'Your data stays yours' },
+                { icon: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>, text: 'Set up in 30 seconds' },
+                { icon: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>, text: 'Free tier forever' },
+              ].map((t) => (
+                <div key={t.text} className="flex items-center gap-2.5 text-white/50">
+                  <span className="text-cyan-400/70">{t.icon}</span>
+                  <span className="text-sm font-medium">{t.text}</span>
+                </div>
+              ))}
+            </div>
+          </ScrollSection>
+        </div>
+      </section>
+
       {/* ═══ COMPARISON ═══ */}
       <section id="features" className="relative py-32 scroll-mt-20">
         <div className="mx-auto max-w-4xl px-6">
@@ -377,17 +608,112 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══ DEMO CTA ═══ */}
-      <section className="relative py-32">
-        <div className="mx-auto max-w-3xl px-6 text-center">
+      {/* ═══ PRODUCT PREVIEW ═══ */}
+      <section id="preview" className="relative py-32 scroll-mt-20">
+        <div className="mx-auto max-w-5xl px-6">
           <ScrollSection>
-            <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              See it in action.
-            </h2>
-            <p className="mx-auto mt-4 max-w-lg text-base text-white/40">
-              No signup needed. Play with projects, tasks, and a full Kanban board—right in your browser.
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-400/80 text-center">
+              See it in action
             </p>
-            <div className="mt-10">
+            <h2 className="mt-4 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              A board that thinks alongside you.
+            </h2>
+            <p className="mx-auto mt-4 max-w-lg text-center text-base text-white/40">
+              Kanban board on the left, AI nudges on the right. No signup needed—try it now.
+            </p>
+          </ScrollSection>
+
+          <ScrollSection delay={200}>
+            <div className="mt-14 rounded-2xl border border-white/10 bg-white/[0.03] p-1.5 shadow-2xl shadow-cyan-500/5 backdrop-blur-sm overflow-hidden">
+              {/* mock browser chrome */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/8">
+                <div className="flex gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                </div>
+                <div className="flex-1 mx-8 rounded-md bg-white/[0.06] px-3 py-1 text-[11px] text-white/30 text-center font-mono">nudge-ai.vercel.app/demo</div>
+              </div>
+
+              {/* mock app layout */}
+              <div className="flex min-h-[360px]">
+                {/* mock sidebar */}
+                <div className="hidden sm:flex w-[160px] shrink-0 flex-col border-r border-white/8 p-3 gap-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-5 w-5 rounded bg-gradient-to-br from-violet-500 to-cyan-400" />
+                    <span className="text-[11px] font-semibold text-white/70">Nudge AI</span>
+                  </div>
+                  <div className="rounded-md bg-white/[0.08] px-2.5 py-1.5 text-[10px] font-medium text-white/60">Projects</div>
+                  <div className="ml-2 rounded-md bg-cyan-400/10 px-2.5 py-1.5 text-[10px] font-medium text-cyan-400">MVP Launch</div>
+                  <div className="ml-2 rounded-md px-2.5 py-1.5 text-[10px] text-white/30">Growth Exp.</div>
+                  <div className="rounded-md px-2.5 py-1.5 text-[10px] text-white/40">Users</div>
+                </div>
+
+                {/* mock board */}
+                <div className="flex-1 p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-sm font-semibold text-white/80">MVP Launch</span>
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-white/40">MVP</span>
+                    <div className="flex-1" />
+                    <div className="rounded-md bg-violet-500/20 border border-violet-400/30 px-2 py-1 text-[10px] font-semibold text-violet-300 flex items-center gap-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
+                      3 nudges
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { col: 'Inbox', dot: 'bg-white/30', cards: [{ t: 'Set up Sentry', tag: 'infra', p: 'P1' }] },
+                      { col: 'Planned', dot: 'bg-amber-400', cards: [{ t: 'Write API docs', tag: 'docs', p: 'P2' }] },
+                      { col: 'In Progress', dot: 'bg-blue-400', cards: [{ t: 'Fix auth redirect', tag: 'bug', p: 'P0' }, { t: 'Ship onboarding', tag: 'launch', p: 'P1' }] },
+                      { col: 'Done', dot: 'bg-emerald-400', cards: [{ t: 'Deploy staging', tag: 'infra', p: 'P2' }] },
+                    ].map((c) => (
+                      <div key={c.col} className="space-y-2">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <div className={['h-2 w-2 rounded-full', c.dot].join(' ')} />
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{c.col}</span>
+                          <span className="text-[10px] text-white/20 ml-auto">{c.cards.length}</span>
+                        </div>
+                        {c.cards.map((card) => (
+                          <div key={card.t} className="rounded-lg border border-white/8 bg-white/[0.04] p-2.5 hover:border-white/15 transition-colors">
+                            <div className="text-[11px] font-medium text-white/70 leading-snug">{card.t}</div>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className="rounded bg-cyan-400/15 px-1 py-0.5 text-[8px] font-medium text-cyan-300">{card.tag}</span>
+                              <span className={['rounded px-1 py-0.5 text-[8px] font-bold', card.p === 'P0' ? 'bg-red-400/15 text-red-300' : card.p === 'P1' ? 'bg-orange-400/15 text-orange-300' : 'bg-white/10 text-white/40'].join(' ')}>{card.p}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* mock nudges panel */}
+                <div className="hidden md:flex w-[200px] shrink-0 flex-col border-l border-white/8 p-3">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <svg className="h-3.5 w-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
+                    <span className="text-[11px] font-semibold text-white/60">Nudges</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="rounded-lg bg-red-400/10 border border-red-400/20 p-2">
+                      <div className="text-[8px] font-semibold text-red-300 uppercase tracking-wider mb-1">Overdue</div>
+                      <div className="text-[10px] text-white/50 leading-snug">"Fix auth redirect" is 2 days overdue</div>
+                    </div>
+                    <div className="rounded-lg bg-amber-400/10 border border-amber-400/20 p-2">
+                      <div className="text-[8px] font-semibold text-amber-300 uppercase tracking-wider mb-1">Stuck</div>
+                      <div className="text-[10px] text-white/50 leading-snug">"Write API docs" — no updates in 5 days</div>
+                    </div>
+                    <div className="rounded-lg bg-violet-400/10 border border-violet-400/20 p-2">
+                      <div className="text-[8px] font-semibold text-violet-300 uppercase tracking-wider mb-1">AI Insight</div>
+                      <div className="text-[10px] text-white/50 leading-snug">Batch infra tasks into a focused sprint</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollSection>
+
+          <ScrollSection delay={350}>
+            <div className="mt-12 text-center">
               <Link
                 to="/demo"
                 className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white transition hover:bg-white/10 hover:border-white/25 hover:shadow-[0_0_40px_rgba(34,211,238,0.15)]"
@@ -428,6 +754,43 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══ BUILT BY ═══ */}
+      <section id="founder" className="relative py-32 scroll-mt-20">
+        <div className="mx-auto max-w-2xl px-6 text-center">
+          <ScrollSection>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-400/80">
+              Built by
+            </p>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              A builder who was tired of bloated project tools.
+            </h2>
+          </ScrollSection>
+
+          <ScrollSection delay={120}>
+            <div className="mt-12 inline-flex flex-col items-center gap-4">
+              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 grid place-items-center text-2xl font-bold text-white shadow-lg shadow-cyan-500/20 ring-2 ring-white/10">
+                A
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-white">Aviroop Banerjee</p>
+                <p className="text-sm text-white/40">Founder &amp; Developer</p>
+              </div>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-white/50">
+                "I spent more time configuring JIRA than building my product. So I built the tracker I actually wanted—fast, minimal, and smart enough to nudge me when I drift."
+              </p>
+              <div className="mt-4 flex items-center gap-4">
+                <a href="https://github.com/Aviroop-001" target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white/60 transition">
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z" clipRule="evenodd" /></svg>
+                </a>
+                <a href="https://linkedin.com/in/aviroop-banerjee" target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white/60 transition">
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                </a>
+              </div>
+            </div>
+          </ScrollSection>
+        </div>
+      </section>
+
       {/* ═══ WAITLIST ═══ */}
       <section id="waitlist" className="relative py-32 scroll-mt-20">
         <div className="mx-auto max-w-xl px-6 text-center">
@@ -465,6 +828,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   )
 }
