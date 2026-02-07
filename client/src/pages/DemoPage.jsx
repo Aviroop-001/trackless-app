@@ -160,6 +160,7 @@ function IconCheck({ className = 'w-4 h-4' }) { return <svg className={className
 function IconCommand({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg> }
 function IconCopy({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg> }
 function IconChat({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg> }
+function IconSparkle({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg> }
 
 /* ───────────────────────── shared components ───────────────── */
 
@@ -697,6 +698,244 @@ function BoardStats({ tasks, activeProjectId }) {
   )
 }
 
+/* ───────────────────────── nudges panel ──────────────────────── */
+
+const NUDGE_META = {
+  overdue:    { icon: IconClock, bg: 'bg-red-50', iconColor: 'text-red-500', badge: 'Overdue', badgeBg: 'bg-red-100', badgeText: 'text-red-700' },
+  stale:      { icon: IconClock, bg: 'bg-amber-50', iconColor: 'text-amber-500', badge: 'Stuck', badgeBg: 'bg-amber-100', badgeText: 'text-amber-700' },
+  unassigned: { icon: IconUsers, bg: 'bg-orange-50', iconColor: 'text-orange-500', badge: 'Unassigned', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
+  nodesc:     { icon: IconChat, bg: 'bg-slate-50', iconColor: 'text-slate-400', badge: 'Missing Info', badgeBg: 'bg-slate-100', badgeText: 'text-slate-600' },
+  workload:   { icon: IconUsers, bg: 'bg-violet-50', iconColor: 'text-violet-500', badge: 'Workload', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
+  idle:       { icon: IconClock, bg: 'bg-blue-50', iconColor: 'text-blue-500', badge: 'Idle', badgeBg: 'bg-blue-100', badgeText: 'text-blue-600' },
+  ai:         { icon: IconSparkle, bg: 'bg-linear-to-br from-violet-50 to-cyan-50', iconColor: 'text-violet-500', badge: 'AI Insight', badgeBg: 'bg-linear-to-r from-violet-100 to-cyan-100', badgeText: 'text-violet-700' },
+}
+
+function NudgeCard({ nudge }) {
+  const meta = NUDGE_META[nudge.type] ?? NUDGE_META.ai
+  const Icon = meta.icon
+  return (
+    <div className={['rounded-xl border border-slate-200/80 p-3.5 shadow-sm', meta.bg].join(' ')} style={{ animation: 'fadeIn 0.2s ease-out' }}>
+      <div className="flex items-start gap-3">
+        <div className={['grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/80 ring-1 ring-slate-200/50', meta.iconColor].join(' ')}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={['inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold', meta.badgeBg, meta.badgeText].join(' ')}>{nudge.type === 'ai' && nudge.aiType === 'warning' ? 'AI Warning' : nudge.type === 'ai' && nudge.aiType === 'tip' ? 'AI Tip' : meta.badge}</span>
+          </div>
+          <p className="text-[13px] text-slate-700 leading-relaxed">{nudge.message}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NudgesPanel({ nudges, loading, onClose, onRefresh }) {
+  const ruleNudges = nudges.filter((n) => n.type !== 'ai')
+  const aiNudges = nudges.filter((n) => n.type === 'ai')
+  const isEmpty = !loading && nudges.length === 0
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[1px] animate-[fadeIn_150ms_ease-out]" onClick={onClose} />
+      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white shadow-2xl animate-[slideInRight_200ms_ease-out]">
+        {/* header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-linear-to-br from-violet-100 to-cyan-100 text-violet-600">
+              <IconSparkle className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold">Nudges</h2>
+              <p className="text-[11px] text-slate-500">{nudges.length} suggestion{nudges.length !== 1 ? 's' : ''} for this board</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={onRefresh} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors" title="Refresh nudges">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+            </button>
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+          </div>
+        </div>
+
+        {/* feed */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          {/* empty state */}
+          {isEmpty && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-500 mb-3">
+                <IconCheck className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-medium text-slate-700">All clear!</p>
+              <p className="mt-1 text-[12px] text-slate-500">No nudges right now. Your board looks healthy.</p>
+            </div>
+          )}
+
+          {/* rule-based nudges */}
+          {ruleNudges.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1">Board Issues</div>
+              {ruleNudges.map((n) => <NudgeCard key={n.id} nudge={n} />)}
+            </div>
+          )}
+
+          {/* AI nudges */}
+          {(aiNudges.length > 0 || loading) && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1 flex items-center gap-1.5">
+                <IconSparkle className="w-3 h-3 text-violet-400" />AI Insights
+              </div>
+              {loading && aiNudges.length === 0 && (
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 animate-pulse">
+                      <div className="flex items-start gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-slate-200/60" />
+                        <div className="flex-1 space-y-2 pt-1">
+                          <div className="h-3 w-16 rounded bg-slate-200/60" />
+                          <div className="h-3 w-full rounded bg-slate-200/60" />
+                          <div className="h-3 w-2/3 rounded bg-slate-200/60" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {aiNudges.map((n) => <NudgeCard key={n.id} nudge={n} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────────────────── nudge helpers ─────────────────────── */
+
+const DAY_MS = 86400000
+
+function computeRuleNudges(tasks, users, activeProjectId) {
+  const nudges = []
+  const pt = tasks.filter((t) => t.projectId === activeProjectId)
+  const now = Date.now()
+
+  // 1. Overdue tasks
+  const overdue = pt.filter((t) => t.status !== 'done' && isOverdue(t.dueDate))
+  for (const t of overdue) {
+    const days = Math.ceil((now - new Date(t.dueDate).getTime()) / DAY_MS)
+    const who = t.assigneeId ? users.find((u) => u.id === t.assigneeId)?.name : null
+    nudges.push({ id: `overdue-${t.id}`, type: 'overdue', message: `"${t.title}" is ${days} day${days > 1 ? 's' : ''} overdue${who ? ` (assigned to ${who})` : ''}.`, priority: 0 })
+  }
+
+  // 2. Stale tasks (in "doing" for 3+ days with no recent comments)
+  const stale = pt.filter((t) => {
+    if (t.status !== 'doing') return false
+    const age = (now - t.createdAt) / DAY_MS
+    if (age < 3) return false
+    const lastComment = (t.comments ?? []).reduce((latest, c) => Math.max(latest, c.createdAt ?? 0), 0)
+    return !lastComment || (now - lastComment) / DAY_MS > 3
+  })
+  for (const t of stale) {
+    const days = Math.floor((now - t.createdAt) / DAY_MS)
+    nudges.push({ id: `stale-${t.id}`, type: 'stale', message: `"${t.title}" has been in progress for ${days} days with no updates. Stuck?`, priority: 1 })
+  }
+
+  // 3. Unassigned high-priority tasks
+  const unassignedHigh = pt.filter((t) => !t.assigneeId && (t.priority === 'p0' || t.priority === 'p1') && t.status !== 'done')
+  for (const t of unassignedHigh) {
+    const p = PRIORITIES.find((x) => x.id === t.priority)
+    nudges.push({ id: `unassigned-${t.id}`, type: 'unassigned', message: `${p?.label ?? 'High'}-priority "${t.title}" has no owner. Assign someone?`, priority: 2 })
+  }
+
+  // 4. Tasks with no description
+  const noDesc = pt.filter((t) => t.status !== 'done' && (!t.description || !t.description.trim()))
+  if (noDesc.length > 0) {
+    if (noDesc.length <= 2) {
+      for (const t of noDesc) nudges.push({ id: `nodesc-${t.id}`, type: 'nodesc', message: `"${t.title}" has no description. Add context so the team knows what to do.`, priority: 4 })
+    } else {
+      nudges.push({ id: 'nodesc-bulk', type: 'nodesc', message: `${noDesc.length} tasks have no description. Adding context helps the team move faster.`, priority: 4 })
+    }
+  }
+
+  // 5. Workload imbalance
+  if (users.length >= 2) {
+    const load = {}
+    for (const u of users) load[u.id] = 0
+    for (const t of pt) { if (t.assigneeId && t.status !== 'done' && load[t.assigneeId] !== undefined) load[t.assigneeId]++ }
+    const counts = Object.entries(load).filter(([, v]) => v > 0)
+    if (counts.length >= 2) {
+      const max = counts.reduce((a, b) => a[1] >= b[1] ? a : b)
+      const min = counts.reduce((a, b) => a[1] <= b[1] ? a : b)
+      if (max[1] >= 3 * Math.max(min[1], 1)) {
+        const maxName = users.find((u) => u.id === max[0])?.name ?? 'Someone'
+        const minName = users.find((u) => u.id === min[0])?.name ?? 'someone'
+        nudges.push({ id: 'workload', type: 'workload', message: `${maxName} has ${max[1]} tasks while ${minName} has ${min[1]}. Consider rebalancing.`, priority: 3 })
+      }
+    }
+  }
+
+  // 6. Idle board (no tasks in "doing")
+  const doingCount = pt.filter((t) => t.status === 'doing').length
+  if (pt.length > 0 && doingCount === 0) {
+    nudges.push({ id: 'idle', type: 'idle', message: 'No tasks are currently in progress. Is the team blocked or between sprints?', priority: 3 })
+  }
+
+  nudges.sort((a, b) => a.priority - b.priority)
+  return nudges
+}
+
+function buildBoardSummary(tasks, users, project) {
+  const pt = tasks.filter((t) => t.projectId === project.id)
+  const now = Date.now()
+  const byStatus = {}
+  for (const s of STATUSES) byStatus[s.id] = pt.filter((t) => t.status === s.id).length
+  const done = byStatus.done ?? 0
+  const total = pt.length
+
+  const overdue = pt.filter((t) => t.status !== 'done' && isOverdue(t.dueDate)).map((t) => ({
+    title: t.title,
+    daysOverdue: Math.ceil((now - new Date(t.dueDate).getTime()) / DAY_MS),
+    assignee: t.assigneeId ? users.find((u) => u.id === t.assigneeId)?.name ?? null : null,
+  }))
+
+  const stale = pt.filter((t) => {
+    if (t.status !== 'doing') return false
+    return (now - t.createdAt) / DAY_MS >= 3
+  }).map((t) => ({
+    title: t.title,
+    status: t.status,
+    daysSinceCreated: Math.floor((now - t.createdAt) / DAY_MS),
+  }))
+
+  const unassigned = pt.filter((t) => !t.assigneeId && (t.priority === 'p0' || t.priority === 'p1') && t.status !== 'done')
+    .map((t) => ({ title: t.title, priority: t.priority }))
+
+  const noDescription = pt.filter((t) => t.status !== 'done' && (!t.description || !t.description.trim())).map((t) => t.title)
+
+  const workload = {}
+  for (const u of users) workload[u.name] = 0
+  let unassignedCount = 0
+  for (const t of pt) {
+    if (t.status === 'done') continue
+    if (t.assigneeId) { const u = users.find((x) => x.id === t.assigneeId); if (u) workload[u.name]++ }
+    else unassignedCount++
+  }
+  workload['unassigned'] = unassignedCount
+
+  return {
+    projectName: project.name,
+    totalTasks: total,
+    byStatus,
+    overdue,
+    stale,
+    unassigned,
+    noDescription,
+    workload,
+    highPriorityCount: pt.filter((t) => (t.priority === 'p0' || t.priority === 'p1') && t.status !== 'done').length,
+    completionRate: total > 0 ? `${Math.round((done / total) * 100)}%` : '0%',
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
@@ -720,6 +959,15 @@ export default function DemoPage() {
   const [showProjectComments, setShowProjectComments] = useState(false)
   const [editingPrefix, setEditingPrefix] = useState(false)
   const [prefixDraft, setPrefixDraft] = useState('')
+  const [showAiModal, setShowAiModal] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiPreview, setAiPreview] = useState(null) // { projectName, tasks[] }
+  const [showNudges, setShowNudges] = useState(false)
+  const [nudges, setNudges] = useState([])
+  const [nudgesLoading, setNudgesLoading] = useState(false)
+  const nudgesFetchedRef = useRef(null) // track which project we already fetched for
   const [newTaskIds, setNewTaskIds] = useState(new Set())
   const newTaskTimerRef = useRef(null)
   const [draggingId, setDraggingId] = useState(null)
@@ -808,6 +1056,63 @@ export default function DemoPage() {
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
   }, [view])
+
+  /* ── AI nudges: auto-trigger on board load ── */
+  const fetchAiNudges = useCallback(async (projectTasks, projectUsers, project) => {
+    setNudgesLoading(true)
+    try {
+      const summary = buildBoardSummary(projectTasks, projectUsers, project)
+      const res = await fetch('/api/ai/nudges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Nudge generation failed')
+      return (body.nudges ?? []).map((n, i) => ({ id: `ai-${i}`, type: 'ai', aiType: n.type, message: n.message, priority: 10 + i }))
+    } catch (err) {
+      console.error('[nudges] AI fetch error:', err)
+      return []
+    } finally {
+      setNudgesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (view !== NAV.board || !activeProjectId) {
+      setShowNudges(false)
+      setNudges([])
+      nudgesFetchedRef.current = null
+      return
+    }
+    // Compute rule-based nudges immediately
+    const ruleNudges = computeRuleNudges(tasks, users, activeProjectId)
+    setNudges(ruleNudges)
+    setShowNudges(ruleNudges.length > 0)
+
+    // Fetch AI nudges only once per project switch
+    if (nudgesFetchedRef.current === activeProjectId) return
+    nudgesFetchedRef.current = activeProjectId
+    const proj = projects.find((p) => p.id === activeProjectId)
+    if (!proj) return
+    fetchAiNudges(tasks, users, proj).then((aiNudges) => {
+      setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiNudges])
+      if (aiNudges.length > 0) setShowNudges(true)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeProjectId])
+
+  const refreshNudges = useCallback(() => {
+    if (!activeProjectId) return
+    const ruleNudges = computeRuleNudges(tasks, users, activeProjectId)
+    setNudges(ruleNudges)
+    nudgesFetchedRef.current = null // allow re-fetch
+    const proj = projects.find((p) => p.id === activeProjectId)
+    if (!proj) return
+    fetchAiNudges(tasks, users, proj).then((aiNudges) => {
+      setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiNudges])
+    })
+  }, [tasks, users, projects, activeProjectId, fetchAiNudges])
 
   const navigate = (nextView, projectId = null) => {
     setData((prev) => ({ ...prev, view: nextView, activeProjectId: projectId ?? prev.activeProjectId }))
@@ -924,6 +1229,80 @@ export default function DemoPage() {
     }))
   }
 
+  /* ── AI project generation ── */
+  const AI_GEN_LIMIT_KEY = 'trackless_ai_gen_count'
+  const getAiGenCount = () => { try { return parseInt(localStorage.getItem(AI_GEN_LIMIT_KEY) || '0') } catch { return 0 } }
+  const incAiGenCount = () => { try { localStorage.setItem(AI_GEN_LIMIT_KEY, String(getAiGenCount() + 1)) } catch { /* */ } }
+
+  const generateWithAi = async () => {
+    const trimmed = aiPrompt.trim()
+    if (!trimmed || aiLoading) return
+    if (getAiGenCount() >= 10) {
+      setAiError('You\'ve reached the generation limit for this session. Reset demo data to start fresh.')
+      return
+    }
+    setAiLoading(true)
+    setAiError('')
+    setAiPreview(null)
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Generation failed')
+      setAiPreview(body)
+      incAiGenCount()
+    } catch (err) {
+      setAiError(err.message || 'Something went wrong. Please try again.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const createAiProject = () => {
+    if (!aiPreview) return
+    const projectId = uid()
+    const prefix = derivePrefix(aiPreview.projectName)
+    const newTasks = (aiPreview.tasks || []).map((t, idx) => ({
+      id: uid(),
+      projectId,
+      number: idx + 1,
+      title: t.title || 'Untitled',
+      description: t.description || '',
+      tags: t.tags || [],
+      status: t.status || 'inbox',
+      priority: t.priority || 'p2',
+      dueDate: null,
+      subtasks: (t.subtasks || []).map((s) => ({ id: uid(), title: s.text || s.title || '', done: false })),
+      comments: [],
+      assigneeId: null,
+      order: idx,
+      createdAt: Date.now(),
+    }))
+    const project = {
+      id: projectId,
+      name: aiPreview.projectName,
+      prefix,
+      taskCounter: newTasks.length + 1,
+      comments: [],
+      createdAt: Date.now(),
+    }
+    setData((p) => ({
+      ...p,
+      projects: [...p.projects, project],
+      tasks: [...p.tasks, ...newTasks],
+      activeProjectId: projectId,
+      view: NAV.board,
+    }))
+    // clean up modal
+    setShowAiModal(false)
+    setAiPrompt('')
+    setAiPreview(null)
+    setAiError('')
+  }
+
   /* ── drag & drop ── */
   const computeIdx = (c, y) => { const els = Array.from(c.querySelectorAll('[data-task-id]')).filter((e) => e.getAttribute('data-task-id') !== draggingId); let i = els.length; for (let j = 0; j < els.length; j++) { const r = els[j].getBoundingClientRect(); if (y < r.top + r.height / 2) { i = j; break } } return i }
   const onDragStart = (e, id) => { try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) } catch { /* */ } setDraggingId(id) }
@@ -979,6 +1358,7 @@ export default function DemoPage() {
             <form onSubmit={addProject} className="mt-6 flex items-center gap-3">
               <input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} placeholder="New project name…" className="flex-1 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm placeholder:text-slate-400 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30" />
               <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />Create</button>
+              <button type="button" onClick={() => setShowAiModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"><IconSparkle className="w-4 h-4" />Generate with AI</button>
             </form>
             <div className="mt-6 space-y-2">
               {projects.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center"><IconFolder className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">No projects yet.</p></div>}
@@ -1050,6 +1430,11 @@ export default function DemoPage() {
                 <button type="button" onClick={() => setShowProjectComments((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', showProjectComments ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')}>
                   <IconChat className="w-3.5 h-3.5" />
                   {(activeProject?.comments ?? []).length > 0 && <span>{(activeProject?.comments ?? []).length}</span>}
+                </button>
+                {/* nudges toggle */}
+                <button type="button" onClick={() => setShowNudges((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors relative', showNudges ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="AI Nudges">
+                  <IconSparkle className="w-3.5 h-3.5" />
+                  {nudges.length > 0 && <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-violet-500 text-[10px] font-bold text-white px-1">{nudges.length}</span>}
                 </button>
                 {/* view toggle */}
                 <div className="hidden sm:flex items-center rounded-lg border border-slate-200 p-0.5">
@@ -1132,8 +1517,168 @@ export default function DemoPage() {
           buildTaskUrl={buildTaskUrl}
         />
       )}
+      {showNudges && !selectedTask && view === NAV.board && (
+        <NudgesPanel
+          nudges={nudges}
+          loading={nudgesLoading}
+          onClose={() => setShowNudges(false)}
+          onRefresh={refreshNudges}
+        />
+      )}
       {showCmdPalette && <CommandPalette tasks={tasks} projects={projects} users={users} onClose={() => setShowCmdPalette(false)} onSelectTask={(id, projectId) => { setData((prev) => ({ ...prev, view: NAV.board, activeProjectId: projectId })); setSelectedTaskId(id) }} onNavigate={navigate} />}
       {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
+
+      {/* AI Generate Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget && !aiLoading) { setShowAiModal(false); setAiPreview(null); setAiError('') } }}>
+          <div className="w-full max-w-2xl mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            {/* header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-linear-to-br from-violet-100 to-cyan-100 text-violet-600"><IconSparkle className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold">Generate Project with AI</h2>
+                  <p className="text-[11px] text-slate-500">Describe what you're building and we'll create a structured plan</p>
+                </div>
+              </div>
+              {!aiLoading && <button type="button" onClick={() => { setShowAiModal(false); setAiPreview(null); setAiError('') }} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>}
+            </div>
+
+            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+              {/* prompt input */}
+              {!aiPreview && (
+                <div>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Describe your project in a few sentences… e.g. 'A SaaS dashboard for managing restaurant reservations with table management, online booking, and customer notifications'"
+                    className="w-full h-28 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm placeholder:text-slate-400 resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors"
+                    disabled={aiLoading}
+                    maxLength={1000}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generateWithAi() }}
+                  />
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{aiPrompt.length}/1000</span>
+                    <span>⌘+Enter to generate</span>
+                  </div>
+
+                  {/* example prompts */}
+                  <div className="mt-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mb-2">Try an example</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        'An internal tool for employee onboarding with checklists, document collection, and IT setup tracking',
+                        'A mobile fitness app with workout tracking, meal plans, progress photos, and social challenges',
+                        'A developer portfolio site with blog, project showcase, contact form, and analytics dashboard',
+                      ].map((ex) => (
+                        <button
+                          key={ex}
+                          type="button"
+                          onClick={() => setAiPrompt(ex)}
+                          disabled={aiLoading}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] text-slate-600 hover:border-cyan-300 hover:bg-cyan-50 transition-colors leading-snug"
+                        >
+                          {ex}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* loading */}
+              {aiLoading && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="h-10 w-10 rounded-full border-2 border-slate-200 border-t-violet-500 animate-spin" />
+                  <p className="mt-4 text-sm font-medium text-slate-600">Planning your project...</p>
+                  <p className="mt-1 text-[12px] text-slate-400">This usually takes 2-3 seconds</p>
+                </div>
+              )}
+
+              {/* error */}
+              {aiError && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{aiError}</div>
+              )}
+
+              {/* preview */}
+              {aiPreview && !aiLoading && (
+                <div>
+                  <div className="mb-4">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mb-1">Generated Project</div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-slate-900">{aiPreview.projectName}</h3>
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500">{derivePrefix(aiPreview.projectName)}</span>
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-slate-500">{aiPreview.tasks?.length ?? 0} tasks generated</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(aiPreview.tasks ?? []).map((t, idx) => {
+                      const pri = PRIORITIES.find((p) => p.id === t.priority)
+                      return (
+                        <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                          <div className="flex items-start gap-2">
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-500 mt-0.5">{derivePrefix(aiPreview.projectName)}-{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-slate-800">{t.title}</span>
+                                {pri && <span className={['inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold', pri.bg, pri.text].join(' ')}>{pri.short}</span>}
+                              </div>
+                              {t.description && <p className="mt-1 text-[12px] text-slate-500 leading-relaxed">{t.description}</p>}
+                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                {(t.tags ?? []).map((tag) => {
+                                  const c = TAG_PALETTE[tagColorIdx(tag)]
+                                  return <span key={tag} className={['rounded-md px-2 py-0.5 text-[10px] font-medium', c.bg, c.text].join(' ')}>{tag}</span>
+                                })}
+                                {t.subtasks?.length > 0 && <span className="text-[11px] text-slate-400">{t.subtasks.length} subtask{t.subtasks.length > 1 ? 's' : ''}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* footer */}
+            <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 bg-slate-50/50">
+              {!aiPreview ? (
+                <>
+                  <div className="text-[11px] text-slate-400">{10 - getAiGenCount()} generations remaining</div>
+                  <button
+                    type="button"
+                    onClick={generateWithAi}
+                    disabled={aiLoading || !aiPrompt.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {aiLoading ? <><div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Generating...</> : <><IconSparkle className="w-4 h-4" />Generate</>}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setAiPreview(null); setAiError('') }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <IconSparkle className="w-4 h-4" />Regenerate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createAiProject}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
+                  >
+                    <IconPlus className="w-4 h-4" />Create Project
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

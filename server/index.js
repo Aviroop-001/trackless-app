@@ -1,13 +1,16 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') })
+
 import healthHandler from './api/health.js'
 import waitlistHandler from './api/waitlist.js'
+import aiGenerateHandler from './api/ai/generate.js'
+import aiNudgesHandler from './api/ai/nudges.js'
 import { migrate } from './lib/db.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -18,6 +21,8 @@ app.use(express.json())
 /* ── API routes ── */
 app.get('/api/health', healthHandler)
 app.post('/api/waitlist', waitlistHandler)
+app.post('/api/ai/generate', aiGenerateHandler)
+app.post('/api/ai/nudges', aiNudgesHandler)
 
 /* ── Serve built client in production ── */
 if (isProd) {
