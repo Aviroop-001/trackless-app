@@ -112,6 +112,16 @@
   .settings-option:hover { border-color: var(--demo-text-muted); background: var(--demo-hover); }
   .settings-option-active { border-color: #22d3ee; color: #0891b2; background: color-mix(in oklab, #22d3ee 8%, var(--demo-surface)); box-shadow: 0 0 0 1px #22d3ee; }
 
+  /* ── Sidebar edge handle ── */
+
+  .sidebar-edge-handle .sidebar-handle {
+    opacity: 1;
+    transition: background 150ms ease;
+  }
+  .sidebar-edge-handle:hover .sidebar-handle {
+    background: var(--demo-hover) !important;
+  }
+
   /* ── Dark mode overrides for demo components ── */
 
   .theme-dark.demo-root main { background: var(--demo-bg); color: var(--demo-text); }
@@ -166,6 +176,31 @@
 
   /* board header */
   .theme-dark.demo-root .border-b.bg-white { background: var(--demo-surface) !important; }
+
+  /* accent backgrounds in dark mode */
+  .theme-dark.demo-root .bg-violet-50\/50,
+  .theme-dark.demo-root .bg-violet-50 { background: rgba(139, 92, 246, 0.15) !important; }
+  .theme-dark.demo-root .border-violet-200,
+  .theme-dark.demo-root .border-violet-200\/80 { border-color: rgba(139, 92, 246, 0.3) !important; }
+  .theme-dark.demo-root .hover\:bg-violet-50:hover { background: rgba(139, 92, 246, 0.2) !important; }
+  .theme-dark.demo-root .hover\:border-violet-300:hover { border-color: rgba(139, 92, 246, 0.5) !important; }
+  .theme-dark.demo-root .bg-cyan-50 { background: rgba(6, 182, 212, 0.15) !important; }
+  .theme-dark.demo-root .border-cyan-400,
+  .theme-dark.demo-root .border-cyan-200 { border-color: rgba(6, 182, 212, 0.4) !important; }
+  .theme-dark.demo-root .bg-amber-50 { background: rgba(245, 158, 11, 0.15) !important; }
+  .theme-dark.demo-root .border-amber-200 { border-color: rgba(245, 158, 11, 0.3) !important; }
+  .theme-dark.demo-root .text-amber-700 { color: #fbbf24 !important; }
+  .theme-dark.demo-root .bg-red-50 { background: rgba(239, 68, 68, 0.15) !important; }
+  .theme-dark.demo-root .border-red-200 { border-color: rgba(239, 68, 68, 0.3) !important; }
+  .theme-dark.demo-root .text-red-700,
+  .theme-dark.demo-root .text-red-600 { color: #f87171 !important; }
+  .theme-dark.demo-root .hover\:bg-red-50:hover { background: rgba(239, 68, 68, 0.2) !important; }
+  .theme-dark.demo-root .bg-emerald-50 { background: rgba(16, 185, 129, 0.15) !important; }
+  .theme-dark.demo-root .border-emerald-200 { border-color: rgba(16, 185, 129, 0.3) !important; }
+
+  /* h-px dividers */
+  .theme-dark.demo-root .h-px.bg-slate-100,
+  .theme-dark.demo-root .h-px.bg-slate-200 { background: var(--demo-border) !important; }
 
   /* scrollbar */
   .theme-dark.demo-root ::-webkit-scrollbar { width: 8px; height: 8px; }

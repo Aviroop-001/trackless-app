@@ -10,6 +10,9 @@ import healthHandler from './api/health.js'
 import waitlistHandler from './api/waitlist.js'
 import aiGenerateHandler from './api/ai/generate.js'
 import aiNudgesHandler from './api/ai/nudges.js'
+import aiQuicktaskHandler from './api/ai/quicktask.js'
+import aiStandupHandler from './api/ai/standup.js'
+import aiRetroHandler from './api/ai/retro.js'
 import { migrate } from './lib/db.js'
 const PORT = process.env.PORT || 3001
 const isProd = process.env.NODE_ENV === 'production'
@@ -23,6 +26,9 @@ app.get('/api/health', healthHandler)
 app.post('/api/waitlist', waitlistHandler)
 app.post('/api/ai/generate', aiGenerateHandler)
 app.post('/api/ai/nudges', aiNudgesHandler)
+app.post('/api/ai/quicktask', aiQuicktaskHandler)
+app.post('/api/ai/standup', aiStandupHandler)
+app.post('/api/ai/retro', aiRetroHandler)
 
 /* ── Serve built client in production ── */
 if (isProd) {

@@ -3,14 +3,19 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 /* ───────────────────────── constants ───────────────────────── */
 
-const STORAGE_KEY = 'nudgeai_demo_v6'
+const STORAGE_KEY = 'nudgeai_demo_v7'
 
-const STATUSES = [
+const DEFAULT_COLUMNS = [
   { id: 'inbox', label: 'Inbox', dot: 'bg-slate-400' },
   { id: 'planned', label: 'Planned', dot: 'bg-amber-400' },
   { id: 'doing', label: 'In Progress', dot: 'bg-blue-500' },
   { id: 'done', label: 'Done', dot: 'bg-emerald-500' },
 ]
+
+// Keep STATUSES as alias for backward compat in places that don't need per-project
+const STATUSES = DEFAULT_COLUMNS
+
+const CUSTOM_COL_COLORS = ['bg-purple-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-lime-500', 'bg-sky-500', 'bg-fuchsia-500', 'bg-yellow-500']
 
 const PRIORITIES = [
   { id: 'p0', label: 'Urgent', short: 'P0', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
@@ -22,7 +27,7 @@ const PRIORITIES = [
 const NAV = { projects: 'projects', users: 'users', teams: 'teams', board: 'board', settings: 'settings' }
 
 const DEFAULT_SETTINGS = { theme: 'light', defaultView: 'kanban', sidebarCollapsed: false, density: 'comfortable' }
-const BOARD_VIEWS = { kanban: 'kanban', list: 'list' }
+const BOARD_VIEWS = { kanban: 'kanban', list: 'list', timeline: 'timeline', heatmap: 'heatmap' }
 
 const TAG_PALETTE = [
   { bg: 'bg-cyan-100', text: 'text-cyan-700' },
@@ -68,6 +73,10 @@ function derivePrefix(name) {
   return first.toUpperCase().slice(0, 6)
 }
 
+function getProjectColumns(project) {
+  return project?.columns ?? DEFAULT_COLUMNS
+}
+
 function taskKey(prefix, number) { return `${prefix}-${number}` }
 
 /** Resolve assigneeId to { type: 'user'|'team', entity } or null */
@@ -77,7 +86,7 @@ function resolveAssignee(assigneeId, users, teams) {
   if (user) return { type: 'user', entity: user }
   const team = (teams ?? []).find((t) => t.id === assigneeId)
   if (team) return { type: 'team', entity: team }
-  return null
+    return null
 }
 
 /** Render comment text with highlighted @mentions (users + teams) */
@@ -127,10 +136,10 @@ function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s
 function seedProjects(users) {
   const now = Date.now()
   return [
-    { id: uid(), name: 'MVP Launch', prefix: 'MVP', taskCounter: 6, comments: [
+    { id: uid(), name: 'MVP Launch', prefix: 'MVP', taskCounter: 6, columns: DEFAULT_COLUMNS.map((c) => ({ ...c })), comments: [
       { id: uid(), authorId: users[0]?.id, text: 'Kicked off the MVP sprint. Let\'s aim for launch by end of month. @Sam Chen can you own the infra tickets?', createdAt: now - 1000 * 60 * 60 * 24 },
     ], createdAt: now - 1000 * 60 * 60 * 48 },
-    { id: uid(), name: 'Growth Experiments', prefix: 'GROWTH', taskCounter: 3, comments: [], createdAt: now - 1000 * 60 * 60 * 24 },
+    { id: uid(), name: 'Growth Experiments', prefix: 'GROWTH', taskCounter: 3, columns: DEFAULT_COLUMNS.map((c) => ({ ...c })), comments: [], createdAt: now - 1000 * 60 * 60 * 24 },
   ]
 }
 
@@ -168,9 +177,9 @@ function seedTasks(p1, p2, users, teams) {
   ]
 }
 
-function normalizeOrders(tasks, pid) {
+function normalizeOrders(tasks, pid, columns = DEFAULT_COLUMNS) {
   const out = tasks.map((t) => ({ ...t }))
-  for (const s of STATUSES) {
+  for (const s of columns) {
     const g = out.filter((t) => t.projectId === pid && t.status === s.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     g.forEach((t, i) => { t.order = i })
   }
@@ -206,13 +215,49 @@ function IconChat({ className = 'w-4 h-4' }) { return <svg className={className}
 function IconSparkle({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg> }
 function IconTeam({ className = 'w-5 h-5' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" /></svg> }
 function IconPencil({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg> }
+function IconSliders({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg> }
 function IconGear({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg> }
 function IconChevronLeft({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> }
 function IconChevronRight({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg> }
+function IconGripVertical({ className = 'w-4 h-4', ...props }) { return <svg className={className} fill="currentColor" viewBox="0 0 20 20" {...props}><circle cx="7" cy="4" r="1.5" /><circle cx="13" cy="4" r="1.5" /><circle cx="7" cy="10" r="1.5" /><circle cx="13" cy="10" r="1.5" /><circle cx="7" cy="16" r="1.5" /><circle cx="13" cy="16" r="1.5" /></svg> }
 function IconSun({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg> }
 function IconMoon({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg> }
 function IconEye({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg> }
 function IconEyeOff({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg> }
+
+function IconBolt({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg> }
+function IconLink({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg> }
+function IconClipboard({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg> }
+function IconTarget({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75v6.75m0 0-3-3m3 3 3-3m-8.25 6a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg> }
+function IconDocument({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg> }
+function IconTimeline({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" /></svg> }
+function IconHeatmap({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" /></svg> }
+function IconChart({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg> }
+function IconBookmark({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg> }
+function IconFilter({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" /></svg> }
+function IconEllipsis({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg> }
+function IconChevronDown({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg> }
+
+/** Simple fuzzy string similarity (0-1). Normalized Levenshtein-like bigram overlap. */
+function stringSimilarity(a, b) {
+  if (!a || !b) return 0
+  const sa = a.toLowerCase().trim(), sb = b.toLowerCase().trim()
+  if (sa === sb) return 1
+  if (sa.length < 2 || sb.length < 2) return 0
+  const bigramsA = new Set(); for (let i = 0; i < sa.length - 1; i++) bigramsA.add(sa.slice(i, i + 2))
+  const bigramsB = new Set(); for (let i = 0; i < sb.length - 1; i++) bigramsB.add(sb.slice(i, i + 2))
+  let overlap = 0; for (const b2 of bigramsB) if (bigramsA.has(b2)) overlap++
+  return (2 * overlap) / (bigramsA.size + bigramsB.size)
+}
+
+/** Default task templates */
+const TASK_TEMPLATES = [
+  { name: 'Bug Report', icon: '🐛', fields: { tags: ['bug'], priority: 'p1', subtasks: ['Reproduce the issue', 'Identify root cause', 'Implement fix', 'Write regression test'] } },
+  { name: 'Feature Request', icon: '✨', fields: { tags: ['feature'], priority: 'p2', subtasks: ['Define requirements', 'Design solution', 'Implement', 'Write tests', 'Update docs'] } },
+  { name: 'Spike / Research', icon: '🔬', fields: { tags: ['research'], priority: 'p3', subtasks: ['Research options', 'Document findings', 'Present recommendation'] } },
+  { name: 'Chore / Maintenance', icon: '🔧', fields: { tags: ['chore'], priority: 'p3', subtasks: [] } },
+  { name: 'Design Task', icon: '🎨', fields: { tags: ['design'], priority: 'p2', subtasks: ['Create mockups', 'Get feedback', 'Finalize designs'] } },
+]
 
 /* ───────────────────────── shared components ───────────────── */
 
@@ -340,7 +385,7 @@ function CommentInput({ users, teams, onSubmit }) {
                 </button>
               )
             }
-            return (
+  return (
               <button key={`u-${item.id}`} type="button" onClick={() => insertMention(item)} className={['flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors', i === mentionIdx ? 'bg-cyan-50 text-cyan-700' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>
                 <Avatar name={item.name} size="sm" /><span>{item.name}</span>
               </button>
@@ -393,7 +438,7 @@ function CommandPalette({ tasks, projects, users, teams, onClose, onSelectTask, 
 
   const results = useMemo(() => {
     const lower = q.trim().toLowerCase()
-    if (!lower) return { tasks: [], projects: [], users: [] }
+    if (!lower) return { tasks: [], projects: [], users: [], teams: [] }
     return {
       tasks: tasks.filter((t) => {
         const proj = projects.find((p) => p.id === t.projectId)
@@ -438,7 +483,7 @@ function CommandPalette({ tasks, projects, users, teams, onClose, onSelectTask, 
                     const proj = projects.find((p) => p.id === t.projectId)
                     return (
                       <button key={t.id} type="button" onClick={() => { onSelectTask(t.id, t.projectId); onClose() }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                        <span className={['h-2 w-2 rounded-full shrink-0', STATUSES.find((s) => s.id === t.status)?.dot].join(' ')} />
+                        <span className={['h-2 w-2 rounded-full shrink-0', getProjectColumns(proj).find((s) => s.id === t.status)?.dot ?? 'bg-slate-400'].join(' ')} />
                         {proj && <TaskId prefix={proj.prefix} number={t.number} />}
                         <span className="truncate flex-1">{t.title}</span>
                         {t.priority && <PriorityBadge priority={t.priority} />}
@@ -462,7 +507,7 @@ function CommandPalette({ tasks, projects, users, teams, onClose, onSelectTask, 
                   <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Teams</div>
                   {results.teams.map((t) => {
                     const tc = TEAM_COLORS.find((c) => c.id === t.color) ?? TEAM_COLORS[0]
-                    return (
+  return (
                       <button key={t.id} type="button" onClick={() => { onNavigate(NAV.teams); onClose() }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
                         <span className={['h-2.5 w-2.5 rounded-full shrink-0', tc.dot].join(' ')} />{t.name}<span className="ml-auto text-[10px] text-slate-400">{t.memberIds.length} members</span>
                       </button>
@@ -510,7 +555,32 @@ function ShortcutHelp({ onClose }) {
 
 /* ───────────────────────── task detail panel ─────────────────── */
 
-function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDelete, onAddComment, onDeleteComment, buildTaskUrl }) {
+function DepPicker({ allTasks, project, columns, onAdd }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const filtered = allTasks.filter((t) => !q || t.title.toLowerCase().includes(q.toLowerCase()))
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-xs text-slate-500 hover:border-slate-300 hover:text-slate-600 transition-colors"><IconLink className="w-3 h-3" />Add blocker</button>
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden" style={{ animation: 'fadeIn 0.1s ease-out' }}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks…" autoFocus className="w-full border-b border-slate-100 px-3 py-2 text-xs placeholder:text-slate-400 focus:outline-none" onKeyDown={(e) => { if (e.key === 'Escape') { setOpen(false); setQ('') } }} />
+      <div className="max-h-32 overflow-y-auto">
+        {filtered.length === 0 && <div className="px-3 py-2 text-[11px] text-slate-400">No tasks found</div>}
+        {filtered.slice(0, 8).map((t) => {
+          const st = (columns ?? DEFAULT_COLUMNS).find((c) => c.id === t.status)
+          return (
+            <button key={t.id} type="button" onClick={() => { onAdd(t.id); setOpen(false); setQ('') }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+              <span className={['h-2 w-2 rounded-full shrink-0', st?.dot ?? 'bg-slate-400'].join(' ')} />
+              {project && <span className="font-mono text-[10px] text-slate-400">{taskKey(project.prefix, t.number)}</span>}
+              <span className="flex-1 truncate">{t.title}</span>
+        </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TaskDetailPanel({ task, project, users, teams, columns, allTasks, onClose, onUpdate, onDelete, onAddComment, onDeleteComment, onAddBlocker, onRemoveBlocker, buildTaskUrl }) {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(task.title)
   const [descDraft, setDescDraft] = useState(task.description ?? '')
@@ -520,7 +590,7 @@ function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDel
   const titleRef = useRef(null)
   const descRef = useRef(null)
 
-  const statusInfo = STATUSES.find((s) => s.id === task.status)
+  const statusInfo = (columns ?? DEFAULT_COLUMNS).find((s) => s.id === task.status)
   const stDone = (task.subtasks ?? []).filter((s) => s.done).length
   const stTotal = (task.subtasks ?? []).length
   const tk = project ? taskKey(project.prefix, task.number) : null
@@ -580,10 +650,10 @@ function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDel
 
           {/* Status + Priority */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</label>
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</label>
               <select value={task.status} onChange={(e) => onUpdate(task.id, { status: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30">
-                {STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {(columns ?? DEFAULT_COLUMNS).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div>
@@ -597,10 +667,10 @@ function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDel
 
           {/* Due date + Assignee */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Due date</label>
               <input type="date" value={task.dueDate ?? ''} onChange={(e) => onUpdate(task.id, { dueDate: e.target.value || null })} className={['mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30', task.dueDate && isOverdue(task.dueDate) && task.status !== 'done' ? 'border-red-300 text-red-700 bg-red-50/50' : 'border-slate-200 text-slate-700 bg-white'].join(' ')} />
-            </div>
+                </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Assignee</label>
               <select value={task.assigneeId ?? ''} onChange={(e) => onUpdate(task.id, { assigneeId: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30">
@@ -643,6 +713,30 @@ function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDel
             </form>
           </div>
 
+          {/* Dependencies */}
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Blocked by {(task.blockedBy ?? []).length > 0 && <span className="text-slate-500 normal-case">({(task.blockedBy ?? []).length})</span>}</label>
+            <div className="mt-2 space-y-1">
+              {(task.blockedBy ?? []).map((bid) => {
+                const blocker = (allTasks ?? []).find((t) => t.id === bid)
+                if (!blocker) return null
+                const bp = project // same project for now
+                return (
+                  <div key={bid} className="group flex items-center gap-2 rounded-lg border border-orange-100 bg-orange-50/50 px-3 py-2 text-sm">
+                    <IconLink className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                    {bp && <span className="text-[10px] font-mono text-orange-500">{taskKey(bp.prefix, blocker.number)}</span>}
+                    <span className="flex-1 text-[13px] text-slate-700 truncate">{blocker.title}</span>
+                    <span className={['h-2 w-2 rounded-full shrink-0', (columns ?? DEFAULT_COLUMNS).find((c) => c.id === blocker.status)?.dot ?? 'bg-slate-400'].join(' ')} />
+                    <button type="button" onClick={() => onRemoveBlocker?.(task.id, bid)} className="rounded p-0.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"><IconX className="w-3 h-3" /></button>
+            </div>
+                )
+              })}
+            </div>
+            <div className="mt-2">
+              <DepPicker task={task} allTasks={(allTasks ?? []).filter((t) => t.projectId === task.projectId && t.id !== task.id && !(task.blockedBy ?? []).includes(t.id))} project={project} columns={columns} onAdd={(bid) => onAddBlocker?.(task.id, bid)} />
+          </div>
+        </div>
+
           {/* Comments */}
           <div>
             <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -673,12 +767,12 @@ function TaskDetailPanel({ task, project, users, teams, onClose, onUpdate, onDel
 
 /* ───────────────────────── task card ────────────────────────── */
 
-function TaskCard({ task, project, users, teams, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew }) {
+function TaskCard({ task, project, users, teams, columns, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew }) {
   const resolved = resolveAssignee(task.assigneeId, users, teams ?? [])
   const assignee = resolved?.type === 'user' ? resolved.entity : null
   const assignedTeam = resolved?.type === 'team' ? resolved.entity : null
   const teamColor = assignedTeam ? TEAM_COLORS.find((c) => c.id === assignedTeam.color) ?? TEAM_COLORS[0] : null
-  const statusInfo = STATUSES.find((s) => s.id === task.status)
+  const statusInfo = (columns ?? DEFAULT_COLUMNS).find((s) => s.id === task.status)
   const overdue = isOverdue(task.dueDate) && task.status !== 'done'
   const commentCount = (task.comments ?? []).length
 
@@ -694,7 +788,7 @@ function TaskCard({ task, project, users, teams, onAssign, onDragStart, onDragEn
               {task.priority && <PriorityBadge priority={task.priority} />}
               {project && <TaskId prefix={project.prefix} number={task.number} />}
             </div>
-          </div>
+              </div>
           {task.description && <p className="mt-0.5 text-[11px] text-slate-400 line-clamp-1">{task.description}</p>}
           {task.tags?.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{task.tags.map((t) => <TagPill key={t} tag={t} />)}</div>}
           <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -712,6 +806,7 @@ function TaskCard({ task, project, users, teams, onAssign, onDragStart, onDragEn
             <SubtaskProgress subtasks={task.subtasks} />
             {task.dueDate && <span className={['inline-flex items-center gap-1 text-[11px]', overdue ? 'text-red-600 font-semibold' : 'text-slate-400'].join(' ')}><IconCalendar className="w-3 h-3" />{formatDate(task.dueDate)}</span>}
             {commentCount > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-slate-400"><IconChat className="w-3 h-3" />{commentCount}</span>}
+            {(task.blockedBy ?? []).length > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-orange-500 font-medium"><IconLink className="w-3 h-3" />Blocked</span>}
           </div>
         </div>
       </div>
@@ -719,27 +814,9 @@ function TaskCard({ task, project, users, teams, onAssign, onDragStart, onDragEn
   )
 }
 
-/* ───────────────────────── kanban column ────────────────────── */
-
-function Column({ title, dot, count, children, status, isDropActive, onDropTask, onDragOverColumn }) {
-  return (
-    <div className="w-[280px] shrink-0 flex flex-col" onDragOver={(e) => onDragOverColumn?.(e, status)} onDrop={(e) => onDropTask?.(e, status)}>
-      <div className="flex items-center gap-2.5 px-1 pb-3">
-        <span className={['h-2.5 w-2.5 rounded-full', dot].join(' ')} />
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{count}</span>
-      </div>
-      <div className={['flex-1 space-y-2 rounded-xl p-2 min-h-[120px] transition-colors duration-150', isDropActive ? 'bg-cyan-50/70 ring-2 ring-cyan-200/70' : 'bg-slate-50/60'].join(' ')} data-column-list={status}>
-        {children}
-        {count === 0 && <div className="flex h-24 flex-col items-center justify-center gap-1 text-slate-400"><div className="h-8 w-8 rounded-lg border-2 border-dashed border-slate-200 grid place-items-center"><IconPlus className="w-3.5 h-3.5 text-slate-300" /></div><span className="text-[11px]">Drop here</span></div>}
-      </div>
-    </div>
-  )
-}
-
 /* ───────────────────────── list view ─────────────────────────── */
 
-function ListView({ tasks, projects, users, teams, onSelect }) {
+function ListView({ tasks, projects, users, teams, columns, onSelect }) {
   return (
     <div className="divide-y divide-slate-100">
       <div className="grid grid-cols-[70px_1fr_80px_80px_100px_90px_70px] gap-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -748,7 +825,7 @@ function ListView({ tasks, projects, users, teams, onSelect }) {
       {tasks.length === 0 && <div className="py-12 text-center text-sm text-slate-400">No tasks match your filters</div>}
       {tasks.map((t) => {
         const resolved = resolveAssignee(t.assigneeId, users, teams ?? [])
-        const status = STATUSES.find((s) => s.id === t.status)
+        const status = (columns ?? DEFAULT_COLUMNS).find((s) => s.id === t.status)
         const proj = projects.find((p) => p.id === t.projectId)
         const overdue = isOverdue(t.dueDate) && t.status !== 'done'
         const assignLabel = resolved?.type === 'user' ? resolved.entity.name.split(' ')[0] : resolved?.type === 'team' ? resolved.entity.name : '—'
@@ -765,10 +842,10 @@ function ListView({ tasks, projects, users, teams, onSelect }) {
             <div>{tc ? <span className={['inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold', tc.pill].join(' ')}>{assignLabel}</span> : <span className="text-[11px] text-slate-500 truncate">{assignLabel}</span>}</div>
             <div className={['text-[11px]', overdue ? 'text-red-600 font-semibold' : 'text-slate-400'].join(' ')}>{t.dueDate ? formatDate(t.dueDate) : '—'}</div>
             <div><SubtaskProgress subtasks={t.subtasks} /></div>
-          </button>
+              </button>
         )
       })}
-    </div>
+          </div>
   )
 }
 
@@ -786,7 +863,7 @@ function BoardStats({ tasks, activeProjectId }) {
       <span><strong className="text-emerald-600">{pct}%</strong> done</span>
       {over > 0 && <><span className="h-3 w-px bg-slate-200" /><span className="text-red-600"><strong>{over}</strong> overdue</span></>}
       <div className="ml-auto h-1.5 w-24 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} /></div>
-    </div>
+        </div>
   )
 }
 
@@ -799,6 +876,7 @@ const NUDGE_META = {
   nodesc:     { icon: IconChat, bg: 'bg-slate-50', iconColor: 'text-slate-400', badge: 'Missing Info', badgeBg: 'bg-slate-100', badgeText: 'text-slate-600' },
   workload:   { icon: IconUsers, bg: 'bg-violet-50', iconColor: 'text-violet-500', badge: 'Workload', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700' },
   idle:       { icon: IconClock, bg: 'bg-blue-50', iconColor: 'text-blue-500', badge: 'Idle', badgeBg: 'bg-blue-100', badgeText: 'text-blue-600' },
+  blocked:    { icon: IconLink, bg: 'bg-orange-50', iconColor: 'text-orange-500', badge: 'Blocked', badgeBg: 'bg-orange-100', badgeText: 'text-orange-700' },
   ai:         { icon: IconSparkle, bg: 'bg-linear-to-br from-violet-50 to-cyan-50', iconColor: 'text-violet-500', badge: 'AI Insight', badgeBg: 'bg-linear-to-r from-violet-100 to-cyan-100', badgeText: 'text-violet-700' },
 }
 
@@ -836,7 +914,7 @@ function NudgesPanel({ nudges, loading, onClose, onRefresh }) {
           <div className="flex items-center gap-2.5">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-linear-to-br from-violet-100 to-cyan-100 text-violet-600">
               <IconSparkle className="w-4 h-4" />
-            </div>
+      </div>
             <div>
               <h2 className="text-sm font-semibold">Nudges</h2>
               <p className="text-[11px] text-slate-500">{nudges.length} suggestion{nudges.length !== 1 ? 's' : ''} for this board</p>
@@ -860,15 +938,15 @@ function NudgesPanel({ nudges, loading, onClose, onRefresh }) {
               </div>
               <p className="text-sm font-medium text-slate-700">All clear!</p>
               <p className="mt-1 text-[12px] text-slate-500">No nudges right now. Your board looks healthy.</p>
-            </div>
-          )}
+          </div>
+        )}
 
           {/* rule-based nudges */}
           {ruleNudges.length > 0 && (
             <div className="space-y-2">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1">Board Issues</div>
               {ruleNudges.map((n) => <NudgeCard key={n.id} nudge={n} />)}
-            </div>
+      </div>
           )}
 
           {/* AI nudges */}
@@ -876,7 +954,7 @@ function NudgesPanel({ nudges, loading, onClose, onRefresh }) {
             <div className="space-y-2">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-1 flex items-center gap-1.5">
                 <IconSparkle className="w-3 h-3 text-violet-400" />AI Insights
-              </div>
+    </div>
               {loading && aiNudges.length === 0 && (
                 <>
                   {[1, 2, 3].map((i) => (
@@ -972,6 +1050,17 @@ function computeRuleNudges(tasks, users, activeProjectId) {
     nudges.push({ id: 'idle', type: 'idle', message: 'No tasks are currently in progress. Is the team blocked or between sprints?', priority: 3 })
   }
 
+  // 7. Blocked tasks with unresolved blockers
+  const blocked = pt.filter((t) => (t.blockedBy ?? []).length > 0 && t.status !== 'done')
+  for (const t of blocked) {
+    const blockerTasks = (t.blockedBy ?? []).map((bid) => tasks.find((bt) => bt.id === bid)).filter(Boolean)
+    const unresolvedBlockers = blockerTasks.filter((bt) => bt.status !== 'done')
+    if (unresolvedBlockers.length > 0) {
+      const who = t.assigneeId ? users.find((u) => u.id === t.assigneeId)?.name : null
+      nudges.push({ id: `blocked-${t.id}`, type: 'blocked', message: `"${t.title}" is blocked by ${unresolvedBlockers.length} unresolved task${unresolvedBlockers.length > 1 ? 's' : ''}${who ? `. ${who} may be waiting.` : '.'}`, priority: 1 })
+    }
+  }
+
   nudges.sort((a, b) => a.priority - b.priority)
   return nudges
 }
@@ -979,8 +1068,9 @@ function computeRuleNudges(tasks, users, activeProjectId) {
 function buildBoardSummary(tasks, users, project) {
   const pt = tasks.filter((t) => t.projectId === project.id)
   const now = Date.now()
+  const cols = getProjectColumns(project)
   const byStatus = {}
-  for (const s of STATUSES) byStatus[s.id] = pt.filter((t) => t.status === s.id).length
+  for (const s of cols) byStatus[s.id] = pt.filter((t) => t.status === s.id).length
   const done = byStatus.done ?? 0
   const total = pt.length
 
@@ -1043,7 +1133,8 @@ export default function DemoPage() {
   const [tagQuery, setTagQuery] = useState('')
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [boardView, setBoardView] = useState(BOARD_VIEWS.kanban)
-  const [quickFilter, setQuickFilter] = useState(null)
+  const [activeFilters, setActiveFilters] = useState([])
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
   const [showCmdPalette, setShowCmdPalette] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showProjectComments, setShowProjectComments] = useState(false)
@@ -1060,6 +1151,7 @@ export default function DemoPage() {
   const [taskFormAssignee, setTaskFormAssignee] = useState('')
   const [taskFormTags, setTaskFormTags] = useState('')
   const [taskFormDueDate, setTaskFormDueDate] = useState('')
+  const [taskFormTemplate, setTaskFormTemplate] = useState(null)
   const [showAiModal, setShowAiModal] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -1070,10 +1162,46 @@ export default function DemoPage() {
   const [teamFormColor, setTeamFormColor] = useState(TEAM_COLORS[0].id)
   const [teamFormMembers, setTeamFormMembers] = useState([])
   const [showColumnSettings, setShowColumnSettings] = useState(false)
+  const [addingColumn, setAddingColumn] = useState(false)
+  const [newColName, setNewColName] = useState('')
+  const [draggingColId, setDraggingColId] = useState(null)
+  const [dragOverColIdx, setDragOverColIdx] = useState(null)
+  const [renamingColId, setRenamingColId] = useState(null)
+  const [renameColValue, setRenameColValue] = useState('')
   const [showNudges, setShowNudges] = useState(false)
   const [nudges, setNudges] = useState([])
   const [nudgesLoading, setNudgesLoading] = useState(false)
   const nudgesFetchedRef = useRef(null) // track which project we already fetched for
+  // NLP quick task
+  const [nlpInput, setNlpInput] = useState('')
+  const [nlpLoading, setNlpLoading] = useState(false)
+  const [nlpResult, setNlpResult] = useState(null)
+  const [showNlpBar, setShowNlpBar] = useState(false)
+  // AI standup
+  const [showStandup, setShowStandup] = useState(false)
+  const [standupData, setStandupData] = useState(null)
+  const [standupLoading, setStandupLoading] = useState(false)
+  // Focus mode
+  const [focusMode, setFocusMode] = useState(false)
+  // Task templates
+  const [showTemplates, setShowTemplates] = useState(false)
+  // Toolbar menus
+  // removed showNewTaskMenu — merged into create task modal
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  // removed searchExpanded — project-level search removed
+  // Duplicate detection
+  const [duplicateWarning, setDuplicateWarning] = useState(null)
+  // Saved views
+  const [savedViews, setSavedViews] = useState(() => { try { const sv = localStorage.getItem('nudgeai_saved_views'); return sv ? JSON.parse(sv) : [] } catch { return [] } })
+  const [showSaveView, setShowSaveView] = useState(false)
+  const [viewNameDraft, setViewNameDraft] = useState('')
+  // Workload heatmap (no extra state needed, computed via useMemo)
+  // AI Retro
+  const [showRetro, setShowRetro] = useState(false)
+  const [retroData, setRetroData] = useState(null)
+  const [retroLoading, setRetroLoading] = useState(false)
+  // Timeline
+  const [timelineDragTask, setTimelineDragTask] = useState(null)
   const [newTaskIds, setNewTaskIds] = useState(new Set())
   const newTaskTimerRef = useRef(null)
   const [draggingId, setDraggingId] = useState(null)
@@ -1153,7 +1281,7 @@ export default function DemoPage() {
   /* ── keyboard shortcuts ── */
   useEffect(() => {
     const fn = (e) => {
-      if (e.key === 'Escape') { if (showColumnSettings) { setShowColumnSettings(false); return } if (showCreateProject) { setShowCreateProject(false); return } if (showCreateTask) { setShowCreateTask(false); return } }
+      if (e.key === 'Escape') { if (showFilterMenu) { setShowFilterMenu(false); return } if (showMoreMenu) { setShowMoreMenu(false); return } if (showSaveView) { setShowSaveView(false); setViewNameDraft(''); return } if (showTemplates) { setShowTemplates(false); return } if (showNlpBar) { setShowNlpBar(false); setNlpInput(''); setNlpResult(null); return } if (showStandup) { setShowStandup(false); setStandupData(null); return } if (showRetro) { setShowRetro(false); setRetroData(null); return } if (focusMode) { setFocusMode(false); return } if (addingColumn) { setAddingColumn(false); setNewColName(''); return } if (renamingColId) { setRenamingColId(null); setRenameColValue(''); return } if (showColumnSettings) { setShowColumnSettings(false); return } if (showCreateProject) { setShowCreateProject(false); return } if (showCreateTask) { setShowCreateTask(false); return } }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowCmdPalette((p) => !p); return }
       if (e.key === '?' && !e.metaKey && !e.ctrlKey) { setShowShortcuts((p) => !p); return }
@@ -1161,7 +1289,7 @@ export default function DemoPage() {
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [view, showCreateProject, showCreateTask, showColumnSettings])
+  }, [view, showCreateProject, showCreateTask, showColumnSettings, addingColumn, renamingColId])
 
   /* ── AI nudges: auto-trigger on board load ── */
   const fetchAiNudges = useCallback(async (projectTasks, projectUsers, project) => {
@@ -1215,19 +1343,85 @@ export default function DemoPage() {
   const navigate = (nextView, projectId = null) => {
     setData((prev) => ({ ...prev, view: nextView, activeProjectId: projectId ?? prev.activeProjectId }))
     if (nextView === NAV.board) setBoardView(settings.defaultView === 'list' ? BOARD_VIEWS.list : BOARD_VIEWS.kanban)
-    setQuery(''); setTagQuery(''); setSelectedTaskId(null); setQuickFilter(null); setShowProjectComments(false)
+    setQuery(''); setTagQuery(''); setSelectedTaskId(null); setActiveFilters([]); setShowProjectComments(false)
   }
 
   const updateSettings = (patch) => setData((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }))
   const toggleSidebar = () => updateSettings({ sidebarCollapsed: !sidebarCollapsed })
 
-  const visibleColumns = activeProject?.visibleColumns ?? STATUSES.map((s) => s.id)
+  const activeColumns = getProjectColumns(activeProject)
+  const visibleColumns = activeProject?.visibleColumns ?? activeColumns.map((s) => s.id)
   const toggleColumn = (colId) => {
     if (!activeProjectId) return
-    const current = activeProject?.visibleColumns ?? STATUSES.map((s) => s.id)
+    const current = activeProject?.visibleColumns ?? activeColumns.map((s) => s.id)
     const next = current.includes(colId) ? current.filter((c) => c !== colId) : [...current, colId]
     if (next.length === 0) return // must keep at least one
     updateProject(activeProjectId, { visibleColumns: next })
+  }
+
+  /* ── column management ── */
+  const addColumn = (name) => {
+    if (!activeProjectId || !name.trim()) return
+    const cols = [...activeColumns]
+    const usedColors = cols.map((c) => c.dot)
+    const dot = CUSTOM_COL_COLORS.find((c) => !usedColors.includes(c)) || CUSTOM_COL_COLORS[cols.length % CUSTOM_COL_COLORS.length]
+    const newCol = { id: uid(), label: name.trim(), dot }
+    // Insert before 'done' (last item)
+    const doneIdx = cols.findIndex((c) => c.id === 'done')
+    if (doneIdx >= 0) cols.splice(doneIdx, 0, newCol); else cols.push(newCol)
+    const vis = activeProject?.visibleColumns ? [...activeProject.visibleColumns, newCol.id] : cols.map((c) => c.id)
+    updateProject(activeProjectId, { columns: cols, visibleColumns: vis })
+    setAddingColumn(false); setNewColName('')
+  }
+
+  const deleteColumn = (colId) => {
+    if (!activeProjectId || colId === 'inbox' || colId === 'done') return
+    const cols = activeColumns.filter((c) => c.id !== colId)
+    const vis = (activeProject?.visibleColumns ?? activeColumns.map((c) => c.id)).filter((id) => id !== colId)
+    // Move tasks in deleted column to inbox
+    setData((p) => ({
+      ...p,
+      projects: p.projects.map((pr) => pr.id === activeProjectId ? { ...pr, columns: cols, visibleColumns: vis } : pr),
+      tasks: p.tasks.map((t) => t.projectId === activeProjectId && t.status === colId ? { ...t, status: 'inbox' } : t),
+    }))
+  }
+
+  const renameColumn = (colId, newLabel) => {
+    if (!activeProjectId || !newLabel.trim()) { setRenamingColId(null); return }
+    const cols = activeColumns.map((c) => c.id === colId ? { ...c, label: newLabel.trim() } : c)
+    updateProject(activeProjectId, { columns: cols })
+    setRenamingColId(null); setRenameColValue('')
+  }
+
+  const reorderColumns = (fromId, toIdx) => {
+    if (!activeProjectId) return
+    const cols = [...activeColumns]
+    const fromIdx = cols.findIndex((c) => c.id === fromId)
+    if (fromIdx < 0 || fromIdx === toIdx) return
+    // Don't allow placing before inbox (idx 0) or after done (last idx)
+    if (toIdx <= 0 || toIdx >= cols.length) return
+    const [moved] = cols.splice(fromIdx, 1)
+    cols.splice(toIdx, 0, moved)
+    // Ensure inbox is first and done is last
+    const inbox = cols.find((c) => c.id === 'inbox')
+    const done = cols.find((c) => c.id === 'done')
+    const mid = cols.filter((c) => c.id !== 'inbox' && c.id !== 'done')
+    const final = inbox ? [inbox, ...mid, ...(done ? [done] : [])] : [...mid, ...(done ? [done] : [])]
+    updateProject(activeProjectId, { columns: final })
+  }
+
+  const onColDragStart = (e, colId) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/column', colId)
+    setDraggingColId(colId)
+  }
+  const onColDragEnd = () => { setDraggingColId(null); setDragOverColIdx(null) }
+  const onColDragOver = (e, idx) => { e.preventDefault(); setDragOverColIdx(idx) }
+  const onColDrop = (e, toIdx) => {
+    e.preventDefault()
+    const colId = e.dataTransfer.getData('text/column') || draggingColId
+    if (colId) reorderColumns(colId, toIdx)
+    setDraggingColId(null); setDragOverColIdx(null)
   }
 
   /* ── filtered tasks ── */
@@ -1239,20 +1433,25 @@ export default function DemoPage() {
       if (!activeProjectId || t.projectId !== activeProjectId) return false
       if (nq && !t.title.toLowerCase().includes(nq)) return false
       if (nt && !(t.tags ?? []).some((x) => x.toLowerCase().includes(nt))) return false
-      if (quickFilter === 'mine' && !t.assigneeId) return false
-      if (quickFilter === 'unassigned' && t.assigneeId) return false
-      if (quickFilter === 'overdue' && (!isOverdue(t.dueDate) || t.status === 'done')) return false
-      if (quickFilter?.startsWith('team:') && t.assigneeId !== quickFilter.slice(5)) return false
+      for (const f of activeFilters) {
+        if (f.type === 'status' && f.value === 'assigned' && !t.assigneeId) return false
+        if (f.type === 'status' && f.value === 'unassigned' && t.assigneeId) return false
+        if (f.type === 'status' && f.value === 'overdue' && (!isOverdue(t.dueDate) || t.status === 'done')) return false
+        if (f.type === 'priority' && t.priority !== f.value) return false
+        if (f.type === 'assignee' && t.assigneeId !== f.value) return false
+        if (f.type === 'team' && t.assigneeId !== f.value) return false
+      }
       return true
     })
-  }, [tasks, activeProjectId, nq, nt, quickFilter])
+  }, [tasks, activeProjectId, nq, nt, activeFilters])
 
   const byStatus = useMemo(() => {
-    const m = Object.fromEntries(STATUSES.map((s) => [s.id, []]))
-    for (const t of filtered) m[t.status]?.push(t)
-    for (const s of STATUSES) m[s.id].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    const cols = getProjectColumns(activeProject)
+    const m = Object.fromEntries(cols.map((s) => [s.id, []]))
+    for (const t of filtered) { if (m[t.status]) m[t.status].push(t); else if (m.inbox) m.inbox.push(t) }
+    for (const s of cols) m[s.id].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     return m
-  }, [filtered])
+  }, [filtered, activeProject])
 
   /* ── FLIP ── */
   useLayoutEffect(() => {
@@ -1274,7 +1473,7 @@ export default function DemoPage() {
   const submitCreateProject = () => {
     const n = projFormName.trim(); if (!n) return
     const prefix = projFormPrefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || derivePrefix(n)
-    setData((p) => ({ ...p, projects: [...p.projects, { id: uid(), name: n, prefix, taskCounter: 1, comments: [], createdAt: Date.now() }] }))
+    setData((p) => ({ ...p, projects: [...p.projects, { id: uid(), name: n, prefix, taskCounter: 1, columns: DEFAULT_COLUMNS.map((c) => ({ ...c })), comments: [], createdAt: Date.now() }] }))
     setShowCreateProject(false)
   }
   const addUser = (e) => { e.preventDefault(); const n = newUserName.trim(); if (!n) return; setData((p) => ({ ...p, users: [...p.users, { id: uid(), name: n, initials: initials(n), createdAt: Date.now() }] })); setNewUserName('') }
@@ -1293,8 +1492,8 @@ export default function DemoPage() {
   }
 
   const openCreateTask = () => {
-    setTaskFormTitle(''); setTaskFormDesc(''); setTaskFormPriority(''); setTaskFormStatus('inbox'); setTaskFormAssignee(''); setTaskFormTags(''); setTaskFormDueDate('')
-    setShowCreateTask(true)
+    setTaskFormTitle(''); setTaskFormDesc(''); setTaskFormPriority(''); setTaskFormStatus('inbox'); setTaskFormAssignee(''); setTaskFormTags(''); setTaskFormDueDate(''); setTaskFormTemplate(null)
+    setDuplicateWarning(null); setShowCreateTask(true)
   }
   const submitCreateTask = () => {
     const title = taskFormTitle.trim(); if (!title || !activeProjectId) return
@@ -1306,7 +1505,7 @@ export default function DemoPage() {
       return {
         ...p,
         projects: p.projects.map((x) => x.id === activeProjectId ? { ...x, taskCounter: number + 1 } : x),
-        tasks: normalizeOrders([{ id, projectId: activeProjectId, number, title, description: taskFormDesc.trim(), tags, status: taskFormStatus || 'inbox', priority: taskFormPriority || null, dueDate: taskFormDueDate || null, subtasks: [], comments: [], assigneeId: taskFormAssignee || null, order: -1, createdAt: Date.now() }, ...p.tasks], activeProjectId),
+        tasks: normalizeOrders([{ id, projectId: activeProjectId, number, title, description: taskFormDesc.trim(), tags, status: taskFormStatus || 'inbox', priority: taskFormPriority || null, dueDate: taskFormDueDate || null, subtasks: (taskFormTemplate?.fields?.subtasks ?? []).map((s) => ({ id: uid(), title: s, done: false })), comments: [], assigneeId: taskFormAssignee || null, blockedBy: [], order: -1, createdAt: Date.now() }, ...p.tasks], activeProjectId),
       }
     })
     setNewTaskIds((p) => new Set(p).add(id))
@@ -1433,6 +1632,7 @@ export default function DemoPage() {
       name: aiPreview.projectName,
       prefix,
       taskCounter: newTasks.length + 1,
+      columns: DEFAULT_COLUMNS.map((c) => ({ ...c })),
       comments: [],
       createdAt: Date.now(),
     }
@@ -1450,11 +1650,285 @@ export default function DemoPage() {
     setAiError('')
   }
 
+  /* ── NLP quick task creation ── */
+  const nlpCreateTask = async () => {
+    const text = nlpInput.trim()
+    if (!text || nlpLoading) return
+    if (getAiCallCount() >= AI_LIMIT) { setNlpResult({ error: 'AI call limit reached. Reset demo to start fresh.' }); return }
+    setNlpLoading(true); setNlpResult(null)
+    try {
+      const ctx = {
+        users: users.map((u) => u.name),
+        teams: teams.map((t) => t.name),
+        projects: projects.map((p) => p.name),
+        tags: [...new Set(tasks.flatMap((t) => t.tags ?? []))].slice(0, 30),
+      }
+      const res = await fetch('/api/ai/quicktask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, context: ctx }) })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Failed to parse task')
+      incAiCallCount()
+      // resolve assignee and project
+      const assignee = body.assigneeName ? users.find((u) => u.name.toLowerCase() === body.assigneeName.toLowerCase()) ?? teams.find((t) => t.name.toLowerCase() === body.assigneeName.toLowerCase()) : null
+      const targetProj = body.projectName ? projects.find((p) => p.name.toLowerCase() === body.projectName.toLowerCase()) : activeProject
+      const pid = targetProj?.id ?? activeProjectId
+      if (!pid) { setNlpResult({ error: 'No project selected. Open a project first.' }); return }
+      const id = uid()
+      setData((p) => {
+        const proj = p.projects.find((x) => x.id === pid)
+        const number = proj?.taskCounter ?? 1
+        return {
+          ...p,
+          projects: p.projects.map((x) => x.id === pid ? { ...x, taskCounter: number + 1 } : x),
+          tasks: normalizeOrders([{ id, projectId: pid, number, title: body.title, description: body.description || '', tags: body.tags || [], status: body.status || 'inbox', priority: body.priority || null, dueDate: null, subtasks: [], comments: [], assigneeId: assignee?.id ?? null, blockedBy: [], order: -1, createdAt: Date.now() }, ...p.tasks], pid),
+        }
+      })
+      setNewTaskIds((p) => new Set(p).add(id))
+      if (newTaskTimerRef.current) clearTimeout(newTaskTimerRef.current)
+      newTaskTimerRef.current = setTimeout(() => setNewTaskIds(new Set()), 400)
+      setNlpResult({ success: true, title: body.title, assignee: assignee?.name || null, priority: body.priority })
+      // Navigate to the project board if not already there
+      if (view !== NAV.board || activeProjectId !== pid) {
+        setData((p) => ({ ...p, view: NAV.board, activeProjectId: pid }))
+      }
+      setTimeout(() => { setNlpInput(''); setNlpResult(null); setShowNlpBar(false) }, 2000)
+    } catch (err) {
+      setNlpResult({ error: err.message })
+    } finally {
+      setNlpLoading(false)
+    }
+  }
+
+  /* ── AI standup generator ── */
+  const buildStandupSummary = () => {
+    if (!activeProjectId || !activeProject) return null
+    const pt = tasks.filter((t) => t.projectId === activeProjectId)
+    const now = Date.now()
+    const DAY = 86400000
+    const memberData = users.map((u) => {
+      const userTasks = pt.filter((t) => t.assigneeId === u.id)
+      return {
+        name: u.name,
+        done: userTasks.filter((t) => t.status === 'done').map((t) => t.title),
+        inProgress: userTasks.filter((t) => t.status === 'doing').map((t) => t.title),
+        blocked: userTasks.filter((t) => (isOverdue(t.dueDate) && t.status !== 'done') || (t.status === 'doing' && (now - t.createdAt) / DAY >= 3)).map((t) => t.title),
+        totalAssigned: userTasks.length,
+      }
+    })
+    const cols = getProjectColumns(activeProject)
+    const byStatus = {}; for (const c of cols) byStatus[c.label] = pt.filter((t) => t.status === c.id).length
+    return { projectName: activeProject.name, totalTasks: pt.length, byStatus, members: memberData, overdue: pt.filter((t) => isOverdue(t.dueDate) && t.status !== 'done').length }
+  }
+
+  const generateStandup = async () => {
+    const summary = buildStandupSummary()
+    if (!summary) return
+    if (getAiCallCount() >= AI_LIMIT) { setStandupData({ error: 'AI call limit reached.' }); return }
+    setStandupLoading(true); setStandupData(null); setShowStandup(true)
+    try {
+      const res = await fetch('/api/ai/standup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary }) })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Failed to generate standup')
+      incAiCallCount()
+      setStandupData(body)
+    } catch (err) {
+      setStandupData({ error: err.message })
+    } finally {
+      setStandupLoading(false)
+    }
+  }
+
+  const copyStandup = () => {
+    if (!standupData || standupData.error) return
+    const lines = [`📋 Daily Standup — ${activeProject?.name ?? 'Project'}`, `${standupData.summary ?? ''}\n`]
+    for (const m of standupData.members ?? []) {
+      lines.push(`**${m.name}**`)
+      if (m.done?.length) lines.push(`  ✅ Done: ${m.done.join(', ')}`)
+      if (m.inProgress?.length) lines.push(`  🔄 In Progress: ${m.inProgress.join(', ')}`)
+      if (m.blocked?.length) lines.push(`  🚫 Blocked: ${m.blocked.join(', ')}`)
+      if (m.highlights) lines.push(`  💡 ${m.highlights}`)
+      lines.push('')
+    }
+    if (standupData.teamHighlights?.length) {
+      lines.push('**Team Highlights**')
+      standupData.teamHighlights.forEach((h) => lines.push(`  • ${h}`))
+    }
+    try { navigator.clipboard.writeText(lines.join('\n')) } catch { /* */ }
+  }
+
+
+  /* ── Task dependencies ── */
+  const addBlocker = (taskId, blockerId) => {
+    if (taskId === blockerId) return
+    setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === taskId ? { ...t, blockedBy: [...new Set([...(t.blockedBy ?? []), blockerId])] } : t) }))
+  }
+  const removeBlocker = (taskId, blockerId) => {
+    setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === taskId ? { ...t, blockedBy: (t.blockedBy ?? []).filter((id) => id !== blockerId) } : t) }))
+  }
+
+  /* ── Duplicate detection ── */
+  const checkDuplicate = useCallback((title) => {
+    if (!title || title.length < 5 || !activeProjectId) { setDuplicateWarning(null); return }
+    const projTasks = tasks.filter((t) => t.projectId === activeProjectId)
+    let bestMatch = null; let bestScore = 0
+    for (const t of projTasks) {
+      const score = stringSimilarity(title, t.title)
+      if (score > bestScore && score > 0.45) { bestScore = score; bestMatch = t }
+    }
+    if (bestMatch) {
+      const proj = projects.find((p) => p.id === bestMatch.projectId)
+      setDuplicateWarning({ task: bestMatch, key: proj ? taskKey(proj.prefix, bestMatch.number) : null, score: bestScore })
+    } else {
+      setDuplicateWarning(null)
+    }
+  }, [tasks, activeProjectId, projects])
+
+  /* ── Focus mode tasks ── */
+  const focusTasks = useMemo(() => {
+    if (!focusMode) return []
+    const myId = users[0]?.id
+    if (!myId) return []
+    return tasks
+      .filter((t) => t.assigneeId === myId && t.status !== 'done')
+      .sort((a, b) => {
+        // Priority sort: p0 > p1 > p2 > p3 > null
+        const pa = a.priority ? parseInt(a.priority[1]) : 9
+        const pb = b.priority ? parseInt(b.priority[1]) : 9
+        if (pa !== pb) return pa - pb
+        // Overdue first
+        const ao = isOverdue(a.dueDate) ? 0 : 1
+        const bo = isOverdue(b.dueDate) ? 0 : 1
+        if (ao !== bo) return ao - bo
+        // Due date ascending
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+        if (a.dueDate) return -1
+        if (b.dueDate) return 1
+        return 0
+      })
+  }, [focusMode, tasks, users])
+
+  /* ── Saved views ── */
+  useEffect(() => { try { localStorage.setItem('nudgeai_saved_views', JSON.stringify(savedViews)) } catch { /* */ } }, [savedViews])
+  const saveCurrentView = () => {
+    const name = viewNameDraft.trim()
+    if (!name || !activeProjectId) return
+    const newView = { id: uid(), name, projectId: activeProjectId, filters: { query, tagQuery, activeFilters, boardView, focusMode }, createdAt: Date.now() }
+    setSavedViews((p) => [...p, newView])
+    setShowSaveView(false); setViewNameDraft('')
+  }
+  const applySavedView = (sv) => {
+    if (sv.projectId !== activeProjectId) {
+      setData((p) => ({ ...p, view: NAV.board, activeProjectId: sv.projectId }))
+    }
+    if (sv.filters.query !== undefined) setQuery(sv.filters.query)
+    if (sv.filters.tagQuery !== undefined) setTagQuery(sv.filters.tagQuery)
+    if (sv.filters.activeFilters !== undefined) setActiveFilters(sv.filters.activeFilters)
+    else if (sv.filters.quickFilter !== undefined) { /* legacy compat */ const qf = sv.filters.quickFilter; if (qf === 'mine') setActiveFilters([{ type: 'status', value: 'assigned', label: 'Assigned' }]); else if (qf === 'unassigned') setActiveFilters([{ type: 'status', value: 'unassigned', label: 'Unassigned' }]); else if (qf === 'overdue') setActiveFilters([{ type: 'status', value: 'overdue', label: 'Overdue' }]); else if (qf?.startsWith('team:')) { const tid = qf.slice(5); const team = teams.find((t) => t.id === tid); setActiveFilters([{ type: 'team', value: tid, label: team?.name ?? 'Team' }]) } else setActiveFilters([]) }
+    if (sv.filters.boardView !== undefined) setBoardView(sv.filters.boardView)
+    if (sv.filters.focusMode !== undefined) setFocusMode(sv.filters.focusMode)
+  }
+  const deleteSavedView = (svId) => setSavedViews((p) => p.filter((v) => v.id !== svId))
+  const projectSavedViews = savedViews.filter((sv) => sv.projectId === activeProjectId)
+
+  /* ── AI Retrospective ── */
+  const buildRetroSummary = () => {
+    if (!activeProjectId || !activeProject) return null
+    const pt = tasks.filter((t) => t.projectId === activeProjectId)
+    const now = Date.now()
+    const DAY = 86400000
+    const WEEK = 7 * DAY
+    const cols = getProjectColumns(activeProject)
+    const byStatus = {}; for (const c of cols) byStatus[c.label] = pt.filter((t) => t.status === c.id).length
+    const completedThisWeek = pt.filter((t) => t.status === 'done' && (now - t.createdAt) < WEEK).length
+    const overdueTasks = pt.filter((t) => isOverdue(t.dueDate) && t.status !== 'done').map((t) => {
+      const days = Math.ceil((now - new Date(t.dueDate).getTime()) / DAY)
+      const who = t.assigneeId ? users.find((u) => u.id === t.assigneeId)?.name ?? 'Unassigned' : 'Unassigned'
+      return { title: t.title, daysPastDue: days, assignee: who }
+    })
+    const workload = {}; for (const u of users) { const ut = pt.filter((t) => t.assigneeId === u.id && t.status !== 'done'); workload[u.name] = { active: ut.length, inProgress: ut.filter((t) => t.status === 'doing').length } }
+    const staleTasks = pt.filter((t) => t.status === 'doing' && (now - t.createdAt) / DAY >= 3).map((t) => t.title)
+    const blockedTasks = pt.filter((t) => (t.blockedBy ?? []).length > 0 && t.status !== 'done').map((t) => ({ title: t.title, blockerCount: (t.blockedBy ?? []).length }))
+    return { projectName: activeProject.name, totalTasks: pt.length, byStatus, completedThisWeek, completionRate: pt.length > 0 ? Math.round(pt.filter((t) => t.status === 'done').length / pt.length * 100) : 0, overdueTasks, staleTasks, blockedTasks, workload, unassigned: pt.filter((t) => !t.assigneeId && t.status !== 'done').length }
+  }
+
+  const generateRetro = async () => {
+    const summary = buildRetroSummary()
+    if (!summary) return
+    if (getAiCallCount() >= AI_LIMIT) { setRetroData({ error: 'AI call limit reached.' }); setShowRetro(true); return }
+    setRetroLoading(true); setRetroData(null); setShowRetro(true)
+    try {
+      const res = await fetch('/api/ai/retro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary }) })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Failed to generate retro')
+      incAiCallCount()
+      setRetroData(body)
+    } catch (err) {
+      setRetroData({ error: err.message })
+    } finally {
+      setRetroLoading(false)
+    }
+  }
+
+  /* ── Workload heatmap data ── */
+  const heatmapData = useMemo(() => {
+    if (boardView !== BOARD_VIEWS.heatmap || !activeProjectId) return null
+    const pt = tasks.filter((t) => t.projectId === activeProjectId && t.status !== 'done')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = []
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today)
+      d.setDate(d.getDate() + i)
+      days.push(d.toISOString().slice(0, 10))
+    }
+    const grid = users.map((u) => {
+      const userTasks = pt.filter((t) => t.assigneeId === u.id)
+      const byDay = {}
+      for (const day of days) {
+        byDay[day] = userTasks.filter((t) => t.dueDate === day).map((t) => ({ id: t.id, title: t.title, priority: t.priority }))
+      }
+      const noDate = userTasks.filter((t) => !t.dueDate)
+      return { user: u, byDay, noDate, total: userTasks.length }
+    })
+    // also unassigned
+    const unassigned = pt.filter((t) => !t.assigneeId)
+    const unassignedByDay = {}
+    for (const day of days) unassignedByDay[day] = unassigned.filter((t) => t.dueDate === day)
+    const unassignedNoDate = unassigned.filter((t) => !t.dueDate)
+    return { days, grid, unassigned: { byDay: unassignedByDay, noDate: unassignedNoDate, total: unassigned.length } }
+  }, [boardView, activeProjectId, tasks, users])
+
+  /* ── Timeline / Gantt data ── */
+  const timelineData = useMemo(() => {
+    if (boardView !== BOARD_VIEWS.timeline || !activeProjectId) return null
+    const pt = tasks.filter((t) => t.projectId === activeProjectId)
+    const withDates = pt.filter((t) => t.dueDate)
+    const noDates = pt.filter((t) => !t.dueDate)
+    if (withDates.length === 0) return { tasks: [], noDates, days: [], startDate: null }
+    const allDates = withDates.map((t) => t.dueDate).sort()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const minDate = new Date(Math.min(today.getTime(), new Date(allDates[0]).getTime()))
+    minDate.setDate(minDate.getDate() - 1)
+    const maxDate = new Date(allDates[allDates.length - 1])
+    maxDate.setDate(maxDate.getDate() + 3)
+    const days = []
+    const d = new Date(minDate)
+    while (d <= maxDate) {
+      days.push(new Date(d).toISOString().slice(0, 10))
+      d.setDate(d.getDate() + 1)
+    }
+    return { tasks: withDates, noDates, days, startDate: minDate.toISOString().slice(0, 10), todayIdx: days.indexOf(today.toISOString().slice(0, 10)) }
+  }, [boardView, activeProjectId, tasks])
+
+  const updateTaskDueDate = (taskId, newDate) => {
+    setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === taskId ? { ...t, dueDate: newDate } : t) }))
+  }
+
   /* ── drag & drop ── */
   const computeIdx = (c, y) => { const els = Array.from(c.querySelectorAll('[data-task-id]')).filter((e) => e.getAttribute('data-task-id') !== draggingId); let i = els.length; for (let j = 0; j < els.length; j++) { const r = els[j].getBoundingClientRect(); if (y < r.top + r.height / 2) { i = j; break } } return i }
-  const onDragStart = (e, id) => { try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) } catch { /* */ } setDraggingId(id) }
+  const onDragStart = (e, id) => { e.stopPropagation(); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id) } catch { /* */ } setDraggingId(id) }
   const onDragEnd = () => { setDraggingId(null); setDragOverStatus(null) }
-  const moveTask = (id, ns, idx = null) => setData((p) => { const c = p.tasks.find((t) => t.id === id); if (!c) return p; const pid = c.projectId; const keep = p.tasks.filter((t) => t.projectId !== pid); const scoped = p.tasks.filter((t) => t.projectId === pid && t.id !== id); const by = Object.fromEntries(STATUSES.map((s) => [s.id, []])); for (const t of scoped) by[t.status]?.push({ ...t }); for (const s of STATUSES) by[s.id].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)); const tgt = by[ns] ?? []; tgt.splice(typeof idx === 'number' ? clamp(idx, 0, tgt.length) : tgt.length, 0, { ...c, status: ns }); by[ns] = tgt; const rebuilt = []; for (const s of STATUSES) by[s.id].forEach((t, i) => rebuilt.push({ ...t, status: s.id, order: i })); return { ...p, tasks: [...keep, ...rebuilt] } })
+  const moveTask = (id, ns, idx = null) => setData((p) => { const c = p.tasks.find((t) => t.id === id); if (!c) return p; const pid = c.projectId; const proj = p.projects.find((x) => x.id === pid); const cols = getProjectColumns(proj); const keep = p.tasks.filter((t) => t.projectId !== pid); const scoped = p.tasks.filter((t) => t.projectId === pid && t.id !== id); const by = Object.fromEntries(cols.map((s) => [s.id, []])); for (const t of scoped) { if (by[t.status]) by[t.status].push({ ...t }); else if (by.inbox) by.inbox.push({ ...t, status: 'inbox' }) } for (const s of cols) by[s.id].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)); const tgt = by[ns] ?? []; tgt.splice(typeof idx === 'number' ? clamp(idx, 0, tgt.length) : tgt.length, 0, { ...c, status: ns }); by[ns] = tgt; const rebuilt = []; for (const s of cols) by[s.id].forEach((t, i) => rebuilt.push({ ...t, status: s.id, order: i })); return { ...p, tasks: [...keep, ...rebuilt] } })
   const onDragOverCol = (e, s) => { e.preventDefault(); setDragOverStatus(s) }
   const onDropTask = (e, s) => { e.preventDefault(); let id; try { id = e.dataTransfer.getData('text/plain') } catch { /* */ } const nid = id || draggingId; if (!nid) return; moveTask(nid, s, computeIdx(e.currentTarget.querySelector(`[data-column-list="${s}"]`) ?? e.currentTarget, e.clientY)); setDraggingId(null); setDragOverStatus(null) }
 
@@ -1466,64 +1940,68 @@ export default function DemoPage() {
   return (
     <div className={[settings.theme === 'dark' ? 'theme-dark' : 'theme-light', `density-${settings.density ?? 'comfortable'}`, 'demo-root flex h-screen overflow-hidden transition-colors duration-200'].join(' ')}>
       {/* SIDEBAR */}
-      <aside className={['flex shrink-0 flex-col border-r transition-all duration-200 sidebar-aside', sidebarCollapsed ? 'w-[56px]' : 'w-[240px]'].join(' ')}>
+      <div className={['relative shrink-0 transition-all duration-200', sidebarCollapsed ? 'w-[56px]' : 'w-[240px]'].join(' ')}>
+        <aside className="flex h-full flex-col border-r sidebar-aside">
         {/* logo */}
-        <div className={['flex h-14 items-center border-b sidebar-header', sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-5'].join(' ')}>
-          <Link to="/" className="flex items-center gap-2.5" title="Nudge AI">
-            <img src="/favicon.png" alt="Nudge AI" className="h-7 w-7 rounded-md shrink-0" />
-            {!sidebarCollapsed && <span className="text-sm font-semibold tracking-tight sidebar-text">Nudge AI</span>}
+          <div className={['flex h-14 items-center border-b sidebar-header', sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-5'].join(' ')}>
+            <Link to="/" className="flex items-center gap-2.5" title="Nudge AI">
+              <img src="/favicon.png" alt="Nudge AI" className="h-7 w-7 rounded-md shrink-0" />
+              {!sidebarCollapsed && <span className="text-sm font-semibold tracking-tight sidebar-text">Nudge AI</span>}
           </Link>
-          {!sidebarCollapsed && <span className="ml-auto rounded-full sidebar-badge px-2 py-0.5 text-[10px] font-semibold">Demo</span>}
+            {!sidebarCollapsed && <span className="ml-auto rounded-full sidebar-badge px-2 py-0.5 text-[10px] font-semibold">Demo</span>}
         </div>
-        <nav className={['flex-1 overflow-y-auto py-4 space-y-0.5', sidebarCollapsed ? 'px-1.5' : 'px-3'].join(' ')}>
-          {/* search */}
-          <button type="button" onClick={() => setShowCmdPalette(true)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors sidebar-item-muted', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'].join(' ')} title="Search (⌘K)">
-            <IconSearch className="w-[18px] h-[18px] shrink-0" />
-            {!sidebarCollapsed && <><span>Search</span><kbd className="ml-auto rounded sidebar-kbd px-1.5 py-0.5 text-[10px] font-semibold">⌘K</kbd></>}
+          <nav className={['flex-1 overflow-y-auto py-4 space-y-0.5', sidebarCollapsed ? 'px-1.5' : 'px-3'].join(' ')}>
+            {/* search */}
+            <button type="button" onClick={() => setShowCmdPalette(true)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors sidebar-item-muted', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'].join(' ')} title="Search (⌘K)">
+              <IconSearch className="w-[18px] h-[18px] shrink-0" />
+              {!sidebarCollapsed && <><span>Search</span><kbd className="ml-auto rounded sidebar-kbd px-1.5 py-0.5 text-[10px] font-semibold">⌘K</kbd></>}
           </button>
-          <div className={['my-2 sidebar-divider', sidebarCollapsed ? 'mx-1' : ''].join(' ')} />
-          {/* projects */}
-          <button type="button" onClick={() => navigate(NAV.projects)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.projects ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Projects">
-            <IconFolder className="w-[18px] h-[18px] shrink-0" />
-            {!sidebarCollapsed && <span>Projects</span>}
-          </button>
-          {!sidebarCollapsed && projects.length > 0 && (
-            <div className="ml-4 border-l sidebar-sublist pl-2 space-y-0.5">
+            <div className={['my-2 sidebar-divider', sidebarCollapsed ? 'mx-1' : ''].join(' ')} />
+            {/* projects */}
+            <button type="button" onClick={() => navigate(NAV.projects)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.projects ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Projects">
+              <IconFolder className="w-[18px] h-[18px] shrink-0" />
+              {!sidebarCollapsed && <span>Projects</span>}
+            </button>
+            {!sidebarCollapsed && projects.length > 0 && (
+              <div className="ml-4 border-l sidebar-sublist pl-2 space-y-0.5">
               {projects.map((p) => (
-                <button key={p.id} type="button" onClick={() => navigate(NAV.board, p.id)} className={['flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors truncate', view === NAV.board && activeProjectId === p.id ? 'sidebar-subitem-active' : 'sidebar-subitem'].join(' ')}>
-                  <IconKanban className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{p.name}</span>
+                  <button key={p.id} type="button" onClick={() => navigate(NAV.board, p.id)} className={['flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors truncate', view === NAV.board && activeProjectId === p.id ? 'sidebar-subitem-active' : 'sidebar-subitem'].join(' ')}>
+                    <IconKanban className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{p.name}</span>
                 </button>
               ))}
             </div>
           )}
-          {/* users */}
-          <button type="button" onClick={() => navigate(NAV.users)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.users ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Users">
-            <IconUsers className="w-[18px] h-[18px] shrink-0" />
-            {!sidebarCollapsed && <span>Users</span>}
+            {/* users */}
+            <button type="button" onClick={() => navigate(NAV.users)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.users ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Users">
+              <IconUsers className="w-[18px] h-[18px] shrink-0" />
+              {!sidebarCollapsed && <span>Users</span>}
           </button>
-          {/* teams */}
-          <button type="button" onClick={() => navigate(NAV.teams)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.teams ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Teams">
-            <IconTeam className="w-[18px] h-[18px] shrink-0" />
-            {!sidebarCollapsed && <span>Teams</span>}
+            {/* teams */}
+            <button type="button" onClick={() => navigate(NAV.teams)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.teams ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Teams">
+              <IconTeam className="w-[18px] h-[18px] shrink-0" />
+              {!sidebarCollapsed && <span>Teams</span>}
           </button>
-          {/* settings */}
-          <button type="button" onClick={() => navigate(NAV.settings)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.settings ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Settings">
-            <IconGear className="w-[18px] h-[18px] shrink-0" />
-            {!sidebarCollapsed && <span>Settings</span>}
-          </button>
-        </nav>
-        <div className={['border-t sidebar-footer space-y-1', sidebarCollapsed ? 'px-1.5 py-3' : 'px-3 py-3'].join(' ')}>
+            {/* settings */}
+            <button type="button" onClick={() => navigate(NAV.settings)} className={['flex w-full items-center rounded-lg text-[13px] font-medium transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2', view === NAV.settings ? 'sidebar-item-active' : 'sidebar-item'].join(' ')} title="Dashboard Settings">
+              <IconGear className="w-[18px] h-[18px] shrink-0" />
+              {!sidebarCollapsed && <span>Dashboard</span>}
+            </button>
+          </nav>
           {!sidebarCollapsed && (
-            <>
+            <div className="border-t sidebar-footer px-3 py-3 space-y-1">
               <button type="button" onClick={resetDemo} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium sidebar-item-muted transition-colors">Reset demo</button>
               <Link to="/#waitlist" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-semibold text-cyan-600 hover:bg-cyan-50 transition-colors">Get early access</Link>
-            </>
-          )}
-          <button type="button" onClick={toggleSidebar} className={['flex w-full items-center rounded-lg text-[13px] font-medium sidebar-item-muted transition-colors', sidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'].join(' ')} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            {sidebarCollapsed ? <IconChevronRight className="w-[18px] h-[18px]" /> : <><IconChevronLeft className="w-[18px] h-[18px]" /><span>Collapse</span></>}
-          </button>
         </div>
+          )}
       </aside>
+        {/* collapse/expand edge — clickable border strip + protruding semicircle handle */}
+        <button type="button" onClick={toggleSidebar} className="sidebar-edge-handle group absolute top-0 right-0 h-full w-3 translate-x-full z-10 cursor-pointer" title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          {/* semicircle tab */}
+          <span className="sidebar-handle absolute top-1/2 left-0 -translate-y-1/2 flex items-center justify-center h-7 w-3.5 rounded-r-full" style={{ background: 'var(--demo-surface)', borderTop: '1px solid var(--demo-border)', borderRight: '1px solid var(--demo-border)', borderBottom: '1px solid var(--demo-border)' }}>
+            {sidebarCollapsed ? <IconChevronRight className="w-2.5 h-2.5 ml-px" style={{ color: 'var(--demo-text-muted)' }} /> : <IconChevronLeft className="w-2.5 h-2.5 ml-px" style={{ color: 'var(--demo-text-muted)' }} />}
+          </span>
+        </button>
+      </div>
 
       {/* MAIN */}
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--demo-bg)' }}>
@@ -1535,7 +2013,7 @@ export default function DemoPage() {
             <div className="mt-6 flex items-center gap-3">
               <button type="button" onClick={openCreateProject} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-4 h-4" />New project</button>
               <button type="button" onClick={() => setShowAiModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-linear-to-r from-violet-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"><IconSparkle className="w-4 h-4" />Generate with AI</button>
-            </div>
+              </div>
             <div className="mt-6 space-y-2">
               {projects.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center"><IconFolder className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm text-slate-500">No projects yet.</p></div>}
               {projects.map((p) => {
@@ -1547,16 +2025,16 @@ export default function DemoPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2"><span className="text-sm font-semibold">{p.name}</span><span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500">{p.prefix}</span></div>
                         <div className="mt-0.5 text-[12px] text-slate-500">{st.total} task{st.total !== 1 ? 's' : ''} · {pct}% done · Created {timeAgo(p.createdAt)}</div>
-                      </div>
+                        </div>
                       <div className="hidden sm:flex items-center gap-3 w-32"><div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} /></div><span className="text-[11px] font-medium text-slate-400 w-8 text-right">{pct}%</span></div>
                     </button>
                     <CopyButton text={buildProjectUrl(p.prefix)} label="Copy project link" />
                     <button type="button" onClick={() => deleteProject(p.id)} className="shrink-0 rounded-md px-2 py-1 text-[11px] text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all">Delete</button>
-                  </div>
+                      </div>
                 )
               })}
-            </div>
-          </div>
+                        </div>
+                      </div>
         )}
 
         {/* USERS */}
@@ -1626,7 +2104,7 @@ export default function DemoPage() {
                             <Avatar name={u.name} size="sm" />
                             <span className="flex-1 text-left">{u.name}</span>
                             {teamFormMembers.includes(u.id) && <IconCheck className="w-4 h-4 text-cyan-600" />}
-                          </button>
+              </button>
                         ))}
                       </div>
                     </div>
@@ -1636,8 +2114,8 @@ export default function DemoPage() {
                     <button type="button" onClick={submitTeamForm} disabled={!teamFormName.trim()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">{editingTeam === 'new' ? 'Create' : 'Save'}</button>
                   </div>
                 </div>
-              </div>
-            )}
+                </div>
+              )}
 
             {/* teams list */}
             <div className="mt-6 space-y-2">
@@ -1661,7 +2139,7 @@ export default function DemoPage() {
                           <div className="flex -space-x-1.5">
                             {members.slice(0, 5).map((u) => <Avatar key={u.id} name={u.name} size="sm" />)}
                             {members.length > 5 && <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500 ring-1 ring-white">+{members.length - 5}</span>}
-                          </div>
+                    </div>
                         ) : (
                           <span className="text-[12px] text-slate-400">No members</span>
                         )}
@@ -1680,7 +2158,7 @@ export default function DemoPage() {
         {/* SETTINGS */}
         {view === NAV.settings && (
           <div className="mx-auto max-w-2xl px-8 py-8">
-            <h1 className="text-xl font-semibold tracking-tight demo-heading">Settings</h1>
+            <h1 className="text-xl font-semibold tracking-tight demo-heading">Dashboard Settings</h1>
             <p className="mt-1 text-sm demo-muted">Customize your dashboard experience.</p>
 
             {/* theme */}
@@ -1688,9 +2166,9 @@ export default function DemoPage() {
               <h2 className="text-sm font-semibold demo-heading">Theme</h2>
               <p className="mt-0.5 text-[12px] demo-muted">Switch between light and dark mode.</p>
               <div className="mt-3 flex gap-3">
-                {[{ id: 'light', label: 'Light', Icon: IconSun }, { id: 'dark', label: 'Dark', Icon: IconMoon }].map(({ id, label, Icon }) => (
-                  <button key={id} type="button" onClick={() => updateSettings({ theme: id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.theme === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
-                    <Icon className="w-4 h-4" />{label}
+                {[{ id: 'light', label: 'Light', icon: IconSun }, { id: 'dark', label: 'Dark', icon: IconMoon }].map((opt) => (
+                  <button key={opt.id} type="button" onClick={() => updateSettings({ theme: opt.id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.theme === opt.id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                    <opt.icon className="w-4 h-4" />{opt.label}
                   </button>
                 ))}
               </div>
@@ -1704,9 +2182,9 @@ export default function DemoPage() {
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-wider demo-muted">Default board view</label>
                   <div className="mt-2 flex gap-3">
-                    {[{ id: 'kanban', label: 'Board', Icon: IconKanban }, { id: 'list', label: 'List', Icon: IconList }].map(({ id, label, Icon }) => (
-                      <button key={id} type="button" onClick={() => updateSettings({ defaultView: id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.defaultView === id ? 'settings-option-active' : 'settings-option'].join(' ')}>
-                        <Icon className="w-4 h-4" />{label}
+                    {[{ id: 'kanban', label: 'Board', icon: IconKanban }, { id: 'list', label: 'List', icon: IconList }].map((opt) => (
+                      <button key={opt.id} type="button" onClick={() => updateSettings({ defaultView: opt.id })} className={['flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all', settings.defaultView === opt.id ? 'settings-option-active' : 'settings-option'].join(' ')}>
+                        <opt.icon className="w-4 h-4" />{opt.label}
                       </button>
                     ))}
                   </div>
@@ -1743,57 +2221,62 @@ export default function DemoPage() {
         {/* BOARD */}
         {view === NAV.board && (
           <div className="flex h-full flex-col">
-            <div className="shrink-0 border-b px-8 py-4 space-y-3" style={{ borderColor: 'var(--demo-border)', background: 'var(--demo-surface)' }}>
-              {/* row 1: nav + title + prefix + view toggle */}
-              <div className="flex items-center gap-4">
-                <button type="button" onClick={() => navigate(NAV.projects)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"><IconArrowLeft className="w-3.5 h-3.5" />Back</button>
-                <h1 className="text-lg font-semibold tracking-tight truncate">{activeProject?.name ?? 'Untitled'}</h1>
-                {/* editable prefix badge */}
+            <div className="shrink-0 border-b px-8 py-3 space-y-2.5" style={{ borderColor: 'var(--demo-border)', background: 'var(--demo-surface)' }}>
+              {/* row 1: project header */}
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => navigate(NAV.projects)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors"><IconArrowLeft className="w-3 h-3" /></button>
+                <h1 className="text-base font-semibold tracking-tight truncate">{activeProject?.name ?? 'Untitled'}</h1>
                 {activeProject && (
                   editingPrefix ? (
-                    <input value={prefixDraft} onChange={(e) => setPrefixDraft(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} onBlur={commitPrefix} onKeyDown={(e) => { if (e.key === 'Enter') commitPrefix(); if (e.key === 'Escape') setEditingPrefix(false) }} className="w-20 rounded bg-cyan-50 border border-cyan-300 px-2 py-0.5 text-[11px] font-mono font-semibold text-cyan-700 focus:outline-none" autoFocus />
+                    <input value={prefixDraft} onChange={(e) => setPrefixDraft(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} onBlur={commitPrefix} onKeyDown={(e) => { if (e.key === 'Enter') commitPrefix(); if (e.key === 'Escape') setEditingPrefix(false) }} className="w-16 rounded bg-cyan-50 border border-cyan-300 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-cyan-700 focus:outline-none" autoFocus />
                   ) : (
-                    <button type="button" onClick={() => { setPrefixDraft(activeProject.prefix); setEditingPrefix(true) }} className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-mono font-semibold text-slate-500 hover:bg-slate-200 transition-colors" title="Click to edit prefix">{activeProject.prefix}</button>
+                    <button type="button" onClick={() => { setPrefixDraft(activeProject.prefix); setEditingPrefix(true) }} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 hover:bg-slate-200 transition-colors" title="Click to edit prefix">{activeProject.prefix}</button>
                   )
                 )}
                 {activeProject && <CopyButton text={buildProjectUrl(activeProject.prefix)} label="Copy project link" />}
                 <div className="flex-1" />
-                {/* project comments toggle */}
-                <button type="button" onClick={() => setShowProjectComments((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', showProjectComments ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')}>
+                {/* comments */}
+                <button type="button" onClick={() => setShowProjectComments((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors', showProjectComments ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'border border-slate-200 text-slate-500 hover:bg-slate-50'].join(' ')} title="Project comments">
                   <IconChat className="w-3.5 h-3.5" />
-                  {(activeProject?.comments ?? []).length > 0 && <span>{(activeProject?.comments ?? []).length}</span>}
+                  <span className="hidden sm:inline">Comments</span>
+                  {(activeProject?.comments ?? []).length > 0 && <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-slate-200 text-[9px] font-bold text-slate-600 px-1">{(activeProject?.comments ?? []).length}</span>}
                 </button>
-                {/* nudges toggle */}
-                <button type="button" onClick={() => { setShowNudges((p) => { if (!p) { /* opening — fetch AI nudges if not yet fetched for this project */ if (nudgesFetchedRef.current !== activeProjectId && getAiCallCount() < AI_LIMIT) { nudgesFetchedRef.current = activeProjectId; incAiCallCount(); const proj = projects.find((x) => x.id === activeProjectId); if (proj) fetchAiNudges(tasks, users, proj).then((aiN) => setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiN])) } } return !p }) }} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors relative', showNudges ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="AI Nudges">
+                {/* nudges */}
+                <button type="button" onClick={() => { setShowNudges((p) => { if (!p) { if (nudgesFetchedRef.current !== activeProjectId && getAiCallCount() < AI_LIMIT) { nudgesFetchedRef.current = activeProjectId; incAiCallCount(); const proj = projects.find((x) => x.id === activeProjectId); if (proj) fetchAiNudges(tasks, users, proj).then((aiN) => setNudges((prev) => [...prev.filter((n) => n.type !== 'ai'), ...aiN])) } } return !p }) }} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors relative', showNudges ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'border border-slate-200 text-slate-500 hover:bg-slate-50'].join(' ')} title="AI Nudges">
                   <IconSparkle className="w-3.5 h-3.5" />
-                  {nudges.length > 0 && <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-violet-500 text-[10px] font-bold text-white px-1">{nudges.length}</span>}
+                  <span className="hidden sm:inline">Nudges</span>
+                  {nudges.length > 0 && <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-violet-500 text-[9px] font-bold text-white px-1">{nudges.length}</span>}
                 </button>
-                {/* column visibility */}
+                {/* settings gear menu */}
                 <div className="relative">
-                  <button type="button" onClick={() => setShowColumnSettings((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', showColumnSettings ? 'bg-slate-100 text-slate-900 border border-slate-300' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'].join(' ')} title="Column visibility">
-                    <IconEye className="w-3.5 h-3.5" />
+                  <button type="button" onClick={() => setShowMoreMenu((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors', showMoreMenu ? 'bg-slate-100 text-slate-700 border border-slate-300' : 'border border-slate-200 text-slate-500 hover:bg-slate-50'].join(' ')} title="Project options">
+                    <IconSliders className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Options</span>
                   </button>
-                  {showColumnSettings && (
-                    <div className="absolute right-0 top-full mt-1 z-30 w-52 rounded-xl border shadow-lg p-2 space-y-0.5" style={{ background: 'var(--demo-surface)', borderColor: 'var(--demo-border)' }}>
-                      <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider demo-muted">Visible columns</div>
-                      {STATUSES.map((s) => {
-                        const active = visibleColumns.includes(s.id)
-                        const isLast = visibleColumns.length === 1 && active
-                        return (
-                          <button key={s.id} type="button" onClick={() => !isLast && toggleColumn(s.id)} className={['flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-colors', isLast ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'].join(' ')} disabled={isLast} style={isLast ? {} : {}}>
-                            <span className={['h-2.5 w-2.5 rounded-full shrink-0', s.dot].join(' ')} />
-                            <span className="flex-1 text-left text-[13px]" style={{ color: 'var(--demo-text-secondary)' }}>{s.label}</span>
-                            {active ? <IconEye className="w-3.5 h-3.5" style={{ color: 'var(--demo-text-muted)' }} /> : <IconEyeOff className="w-3.5 h-3.5" style={{ color: 'var(--demo-text-muted)' }} />}
-                          </button>
-                        )
-                      })}
-                    </div>
+                  {showMoreMenu && (
+                    <><div className="fixed inset-0 z-20" onClick={() => setShowMoreMenu(false)} /><div className="absolute right-0 top-full mt-1 z-30 w-60 rounded-xl border border-slate-200 shadow-lg bg-white p-1.5 overflow-hidden" style={{ animation: 'fadeIn 0.1s ease-out' }}>
+                      <button type="button" onClick={() => { setShowColumnSettings(true); setShowMoreMenu(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"><IconGear className="w-4 h-4 text-slate-400" />Column settings</button>
+                      <button type="button" onClick={() => { generateStandup(); setShowMoreMenu(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"><IconSparkle className="w-4 h-4 text-violet-500" />Generate standup</button>
+                      <button type="button" onClick={() => { generateRetro(); setShowMoreMenu(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"><IconSparkle className="w-4 h-4 text-violet-500" />Weekly digest</button>
+                      <div className="my-1 h-px bg-slate-100" />
+                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Views</div>
+                      <button type="button" onClick={() => { setBoardView(BOARD_VIEWS.kanban); setShowMoreMenu(false) }} className={['flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors', boardView === BOARD_VIEWS.kanban ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}><IconKanban className="w-4 h-4 text-slate-400" />Board</button>
+                      <button type="button" onClick={() => { setBoardView(BOARD_VIEWS.list); setShowMoreMenu(false) }} className={['flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors', boardView === BOARD_VIEWS.list ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}><IconList className="w-4 h-4 text-slate-400" />List</button>
+                      <button type="button" onClick={() => { setBoardView(BOARD_VIEWS.timeline); setShowMoreMenu(false) }} className={['flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors', boardView === BOARD_VIEWS.timeline ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}><IconTimeline className="w-4 h-4 text-slate-400" />Timeline</button>
+                      <button type="button" onClick={() => { setBoardView(BOARD_VIEWS.heatmap); setShowMoreMenu(false) }} className={['flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors', boardView === BOARD_VIEWS.heatmap ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}><IconHeatmap className="w-4 h-4 text-slate-400" />Workload heatmap</button>
+                      <div className="my-1 h-px bg-slate-100" />
+                      <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Saved Filters</div>
+                      {projectSavedViews.map((sv) => (
+                        <div key={sv.id} className="group flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors">
+                          <button type="button" onClick={() => { applySavedView(sv); setShowMoreMenu(false) }} className="flex-1 text-left text-[13px] text-slate-700 truncate"><IconFilter className="w-3 h-3 inline mr-1.5 text-slate-400" />{sv.name}</button>
+                          <button type="button" onClick={() => deleteSavedView(sv.id)} className="rounded p-0.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"><IconX className="w-3 h-3" /></button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => { setShowSaveView(true); setShowMoreMenu(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-slate-500 hover:bg-slate-50 transition-colors"><IconBookmark className="w-4 h-4 text-slate-400" />Save current view…</button>
+                      <div className="my-1 h-px bg-slate-100" />
+                      <button type="button" onClick={() => { resetDemo(); setShowMoreMenu(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors"><IconTrash className="w-4 h-4 text-red-400" />Reset demo data</button>
+                    </div></>
                   )}
-                </div>
-                {/* view toggle */}
-                <div className="hidden sm:flex items-center rounded-lg border border-slate-200 p-0.5">
-                  <button type="button" onClick={() => setBoardView(BOARD_VIEWS.kanban)} className={['rounded-md px-2.5 py-1 text-xs font-medium transition-colors', boardView === BOARD_VIEWS.kanban ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'].join(' ')}><IconKanban className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />Board</button>
-                  <button type="button" onClick={() => setBoardView(BOARD_VIEWS.list)} className={['rounded-md px-2.5 py-1 text-xs font-medium transition-colors', boardView === BOARD_VIEWS.list ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'].join(' ')}><IconList className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />List</button>
                 </div>
               </div>
 
@@ -1806,54 +2289,360 @@ export default function DemoPage() {
                 </div>
               )}
 
-              {/* row 2: add task + search */}
-              <div className="flex items-center gap-6">
-                <button type="button" onClick={openCreateTask} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"><IconPlus className="w-3.5 h-3.5" />New task</button>
-                <div className="flex-1" />
-                <div className="hidden sm:flex items-center gap-2">
-                  <div className="relative">
-                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                    <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-32 rounded-lg border border-slate-200 bg-[#f8f9fb] pl-8 pr-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" />
-                    {query && <button type="button" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"><IconX className="w-3 h-3" /></button>}
-                  </div>
+              {/* save view modal (triggered from more menu) */}
+              {showSaveView && (
+                <div className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 px-4 py-2.5 animate-[slideUp_150ms_ease-out]">
+                  <IconBookmark className="w-4 h-4 text-cyan-500 shrink-0" />
+                  <span className="text-[12px] text-slate-600 shrink-0">Save view as:</span>
+                  <input value={viewNameDraft} onChange={(e) => setViewNameDraft(e.target.value)} placeholder="View name…" className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-cyan-400/70 focus:outline-none" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentView(); if (e.key === 'Escape') { setShowSaveView(false); setViewNameDraft('') } }} />
+                  <button type="button" onClick={saveCurrentView} disabled={!viewNameDraft.trim()} className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-40 transition-colors shrink-0">Save</button>
+                  <button type="button" onClick={() => { setShowSaveView(false); setViewNameDraft('') }} className="rounded p-1 text-slate-400 hover:text-slate-600"><IconX className="w-3 h-3" /></button>
                 </div>
+              )}
+
+              {/* row 2: create + focus */}
+              <div className="flex items-center gap-2">
+                {/* new task button */}
+                <button type="button" onClick={openCreateTask} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-slate-800 transition-colors"><IconPlus className="w-3.5 h-3.5" />New task</button>
+                {/* focus toggle */}
+                <button type="button" onClick={() => setFocusMode((p) => !p)} className={['inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-medium transition-colors', focusMode ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'].join(' ')} title="Focus mode"><IconTarget className="w-3.5 h-3.5" /><span className="hidden sm:inline">Focus</span></button>
               </div>
-              {/* row 3: quick filters + stats */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  {[{ key: null, label: 'All' }, { key: 'mine', label: 'Assigned' }, { key: 'unassigned', label: 'Unassigned' }, { key: 'overdue', label: 'Overdue' }].map((f) => (
-                    <button key={f.key ?? 'all'} type="button" onClick={() => setQuickFilter(f.key)} className={['rounded-full px-3 py-1 text-[11px] font-medium transition-colors', quickFilter === f.key ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'].join(' ')}>{f.label}</button>
-                  ))}
-                  {teams.length > 0 && <span className="h-4 w-px bg-slate-200" />}
-                  {teams.map((t) => {
-                    const tc = TEAM_COLORS.find((c) => c.id === t.color) ?? TEAM_COLORS[0]
-                    const fKey = `team:${t.id}`
-                    return <button key={fKey} type="button" onClick={() => setQuickFilter(quickFilter === fKey ? null : fKey)} className={['rounded-full px-3 py-1 text-[11px] font-medium transition-colors inline-flex items-center gap-1', quickFilter === fKey ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'].join(' ')}><span className={['h-1.5 w-1.5 rounded-full', quickFilter === fKey ? 'bg-white' : tc.dot].join(' ')} />{t.name}</button>
-                  })}
+              {/* NLP quick-create bar */}
+              {showNlpBar && (
+                <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-2.5 animate-[slideUp_150ms_ease-out]">
+                  <IconSparkle className="w-4 h-4 text-violet-500 shrink-0" />
+                  <input value={nlpInput} onChange={(e) => setNlpInput(e.target.value)} placeholder='Describe a task… e.g. "fix the auth bug, assign to Sam, urgent"' className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-violet-400/70 focus:outline-none" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') nlpCreateTask(); if (e.key === 'Escape') { setShowNlpBar(false); setNlpInput(''); setNlpResult(null) } }} />
+                  {nlpLoading ? (
+                    <div className="h-4 w-4 rounded-full border-2 border-violet-300 border-t-violet-600 animate-spin shrink-0" />
+                  ) : nlpResult?.success ? (
+                    <span className="text-[12px] font-medium text-emerald-600 shrink-0">Created "{nlpResult.title}"</span>
+                  ) : nlpResult?.error ? (
+                    <span className="text-[12px] font-medium text-red-500 shrink-0">{nlpResult.error}</span>
+                  ) : (
+                    <button type="button" onClick={nlpCreateTask} disabled={!nlpInput.trim()} className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40 transition-colors shrink-0">Create</button>
+                  )}
                 </div>
+              )}
+              {/* row 3: expandable filters + stats */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* + Filter button */}
+                <div className="relative">
+                  <button type="button" onClick={() => setShowFilterMenu((p) => !p)} className={['inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors', showFilterMenu ? 'border-cyan-400 bg-cyan-50 text-cyan-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'].join(' ')}>
+                    <IconFilter className="w-3.5 h-3.5" />Filter
+                  </button>
+                  {showFilterMenu && (
+                    <><div className="fixed inset-0 z-20" onClick={() => setShowFilterMenu(false)} /><div className="absolute left-0 top-full mt-1 z-30 w-56 rounded-xl border border-slate-200 shadow-lg bg-white p-1.5 max-h-80 overflow-y-auto" style={{ animation: 'fadeIn 0.1s ease-out' }}>
+                      {/* Status */}
+                      <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Status</div>
+                      {[{ value: 'assigned', label: 'Assigned' }, { value: 'unassigned', label: 'Unassigned' }, { value: 'overdue', label: 'Overdue' }].map((opt) => {
+                        const active = activeFilters.some((f) => f.type === 'status' && f.value === opt.value)
+                        return <button key={opt.value} type="button" onClick={() => { if (active) setActiveFilters((p) => p.filter((f) => !(f.type === 'status' && f.value === opt.value))); else setActiveFilters((p) => [...p, { type: 'status', value: opt.value, label: opt.label }]); }} className={['flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors', active ? 'bg-cyan-50 text-cyan-700 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>{active ? <span className="w-4 h-4 text-center text-cyan-600 text-[11px]">✓</span> : <span className="w-4" />}{opt.label}</button>
+                      })}
+                      <div className="my-1 h-px bg-slate-100" />
+                      {/* Priority */}
+                      <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Priority</div>
+                      {PRIORITIES.map((p) => {
+                        const active = activeFilters.some((f) => f.type === 'priority' && f.value === p.id)
+                        return <button key={p.id} type="button" onClick={() => { if (active) setActiveFilters((prev) => prev.filter((f) => !(f.type === 'priority' && f.value === p.id))); else setActiveFilters((prev) => [...prev, { type: 'priority', value: p.id, label: `${p.short} ${p.label}` }]); }} className={['flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors', active ? 'bg-cyan-50 text-cyan-700 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>{active ? <span className="w-4 h-4 text-center text-cyan-600 text-[11px]">✓</span> : <span className={['w-2 h-2 rounded-full ml-1 mr-1', p.dot].join(' ')} />}{p.short} – {p.label}</button>
+                      })}
+                      <div className="my-1 h-px bg-slate-100" />
+                      {/* Assignee */}
+                      <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Assignee</div>
+                      {users.map((u) => {
+                        const active = activeFilters.some((f) => f.type === 'assignee' && f.value === u.id)
+                        return <button key={u.id} type="button" onClick={() => { if (active) setActiveFilters((prev) => prev.filter((f) => !(f.type === 'assignee' && f.value === u.id))); else setActiveFilters((prev) => [...prev, { type: 'assignee', value: u.id, label: u.name }]); }} className={['flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors', active ? 'bg-cyan-50 text-cyan-700 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>{active ? <span className="w-4 h-4 text-center text-cyan-600 text-[11px]">✓</span> : <span className="w-4" />}{u.name}</button>
+                      })}
+                      {teams.length > 0 && <>
+                        <div className="my-1 h-px bg-slate-100" />
+                        {/* Team */}
+                        <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Team</div>
+                        {teams.map((t) => {
+                          const tc = TEAM_COLORS.find((c) => c.id === t.color) ?? TEAM_COLORS[0]
+                          const active = activeFilters.some((f) => f.type === 'team' && f.value === t.id)
+                          return <button key={t.id} type="button" onClick={() => { if (active) setActiveFilters((prev) => prev.filter((f) => !(f.type === 'team' && f.value === t.id))); else setActiveFilters((prev) => [...prev, { type: 'team', value: t.id, label: t.name }]); }} className={['flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors', active ? 'bg-cyan-50 text-cyan-700 font-medium' : 'text-slate-700 hover:bg-slate-50'].join(' ')}>{active ? <span className="w-4 h-4 text-center text-cyan-600 text-[11px]">✓</span> : <span className={['w-2 h-2 rounded-full ml-1 mr-1', tc.dot].join(' ')} />}{t.name}</button>
+                        })}
+                      </>}
+                    </div></>
+                  )}
+                </div>
+                {/* active filter pills */}
+                {activeFilters.map((f, i) => (
+                  <span key={`${f.type}-${f.value}-${i}`} className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-medium text-cyan-700 animate-[fadeIn_100ms_ease-out]">
+                    <span className="text-[10px] text-cyan-500 uppercase">{f.type === 'status' ? '' : `${f.type}: `}</span>{f.label}
+                    <button type="button" onClick={() => setActiveFilters((p) => p.filter((_, j) => j !== i))} className="rounded-full p-0.5 text-cyan-400 hover:text-cyan-600 hover:bg-cyan-100 transition-colors"><IconX className="w-2.5 h-2.5" /></button>
+                  </span>
+                ))}
+                {activeFilters.length > 0 && (
+                  <button type="button" onClick={() => setActiveFilters([])} className="text-[11px] text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-2">Clear all</button>
+                )}
                 <div className="flex-1" />
                 <BoardStats tasks={tasks} activeProjectId={activeProjectId} />
               </div>
             </div>
 
             {/* board body */}
-            {boardView === BOARD_VIEWS.kanban ? (
-              <div className="flex-1 overflow-x-auto overflow-y-auto px-8 py-6">
-                <div className="flex gap-5 h-full">
-                  {STATUSES.filter((s) => visibleColumns.includes(s.id)).map((s) => (
-                    <Column key={s.id} title={s.label} dot={s.dot} status={s.id} count={(byStatus[s.id] ?? []).length} isDropActive={dragOverStatus === s.id} onDropTask={onDropTask} onDragOverColumn={onDragOverCol}>
-                      {(byStatus[s.id] ?? []).map((t) => (
-                        <TaskCard key={t.id} task={t} project={activeProject} users={users} teams={teams} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} />
-                      ))}
-                    </Column>
-                  ))}
+            {focusMode ? (
+              <div className="flex-1 overflow-y-auto px-8 py-6">
+                <div className="mx-auto max-w-2xl">
+                  <div className="flex items-center gap-3 mb-6">
+                    <IconTarget className="w-5 h-5 text-cyan-500" />
+                    <div>
+                      <h2 className="text-base font-semibold text-slate-900">Focus Mode</h2>
+                      <p className="text-[12px] text-slate-500">Your tasks, sorted by priority. {focusTasks.length === 0 ? 'Nothing assigned to you!' : `${focusTasks.length} task${focusTasks.length !== 1 ? 's' : ''} to focus on.`}</p>
+                    </div>
+                  </div>
+                  {focusTasks.length === 0 ? (
+                    <div className="rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
+                      <div className="text-3xl mb-2">🎉</div>
+                      <p className="text-sm text-slate-500">You're all caught up! No tasks assigned to you.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {focusTasks.map((t, idx) => {
+                        const proj = projects.find((p) => p.id === t.projectId)
+                        const overdue = isOverdue(t.dueDate) && t.status !== 'done'
+                        const statusInfo = activeColumns.find((c) => c.id === t.status)
+                        const blockers = (t.blockedBy ?? []).map((bid) => tasks.find((bt) => bt.id === bid)).filter(Boolean)
+                        return (
+                          <button key={t.id} type="button" onClick={() => setSelectedTaskId(t.id)} className={['w-full text-left rounded-xl border p-4 transition-all hover:shadow-md', overdue ? 'border-red-200 bg-red-50/30' : 'border-slate-200 bg-white hover:border-slate-300'].join(' ')}>
+                            <div className="flex items-start gap-3">
+                              <span className="mt-1 text-lg font-semibold text-slate-300 w-6 text-right">{idx + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {statusInfo && <span className={['h-2 w-2 rounded-full shrink-0', statusInfo.dot].join(' ')} />}
+                                  <span className="text-[13px] font-medium text-slate-900 truncate">{t.title}</span>
+                                  {t.priority && <PriorityBadge priority={t.priority} />}
+                                  {proj && <TaskId prefix={proj.prefix} number={t.number} />}
+                                </div>
+                                <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                                  {t.dueDate && <span className={['inline-flex items-center gap-1 text-[11px]', overdue ? 'text-red-600 font-semibold' : 'text-slate-400'].join(' ')}><IconCalendar className="w-3 h-3" />{formatDate(t.dueDate)}{overdue && ' (overdue)'}</span>}
+                                  {(t.tags ?? []).map((tag) => <TagPill key={tag} tag={tag} />)}
+                                  {blockers.length > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-orange-600 font-medium"><IconLink className="w-3 h-3" />Blocked by {blockers.length} task{blockers.length > 1 ? 's' : ''}</span>}
+                                  <SubtaskProgress subtasks={t.subtasks} />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto">
-                <ListView tasks={filtered.filter((t) => visibleColumns.includes(t.status))} projects={projects} users={users} teams={teams} onSelect={setSelectedTaskId} />
+            ) : boardView === BOARD_VIEWS.kanban ? (
+            <div className="flex-1 overflow-x-auto overflow-y-auto px-8 py-6">
+              <div className="flex gap-5 h-full">
+                  {activeColumns.filter((s) => visibleColumns.includes(s.id)).map((s) => {
+                    const isPinned = s.id === 'inbox' || s.id === 'done'
+                    const colIdx = activeColumns.findIndex((c) => c.id === s.id)
+                    const count = (byStatus[s.id] ?? []).length
+
+                    return (
+                      <div key={s.id} className={['w-[280px] shrink-0 flex flex-col', draggingColId === s.id ? 'opacity-40' : ''].join(' ')}
+                        draggable={!isPinned}
+                        onDragStart={!isPinned ? (e) => { if (e.target.closest('[data-task-id]')) return; e.stopPropagation(); onColDragStart(e, s.id) } : undefined}
+                        onDragEnd={!isPinned ? onColDragEnd : undefined}
+                        onDragOver={!isPinned ? (e) => { if (draggingColId) { onColDragOver(e, colIdx) } else { onDragOverCol(e, s.id) } } : (e) => onDragOverCol(e, s.id)}
+                        onDrop={(e) => { if (draggingColId) { onColDrop(e, colIdx) } else { onDropTask(e, s.id) } }}
+                      >
+                        {/* column header */}
+                        <div className={['flex items-center gap-2.5 px-1 pb-3 group/header', !isPinned ? 'cursor-grab active:cursor-grabbing' : ''].join(' ')}>
+                          {dragOverColIdx === colIdx && draggingColId && <div className="absolute left-0 top-0 w-0.5 h-full bg-cyan-400 rounded-full" />}
+                          <span className={['h-2.5 w-2.5 rounded-full', s.dot].join(' ')} />
+                          {renamingColId === s.id ? (
+                            <input value={renameColValue} onChange={(e) => setRenameColValue(e.target.value)} autoFocus className="flex-1 rounded border border-cyan-300 bg-cyan-50/30 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-slate-600 focus:outline-none" onBlur={() => renameColumn(s.id, renameColValue)} onKeyDown={(e) => { if (e.key === 'Enter') renameColumn(s.id, renameColValue); if (e.key === 'Escape') { setRenamingColId(null); setRenameColValue('') } }} />
+                          ) : (
+                            <span className={['text-xs font-semibold uppercase tracking-wider text-slate-500', !isPinned ? 'cursor-text' : ''].join(' ')} onDoubleClick={!isPinned ? () => { setRenamingColId(s.id); setRenameColValue(s.label) } : undefined}>{s.label}</span>
+                          )}
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{count}</span>
+                        </div>
+                        <div className={['flex-1 space-y-2 rounded-xl p-2 min-h-[120px] transition-colors duration-150', dragOverStatus === s.id && !draggingColId ? 'bg-cyan-50/70 ring-2 ring-cyan-200/70' : 'bg-slate-50/60'].join(' ')} data-column-list={s.id} onDragOver={(e) => { if (!draggingColId) onDragOverCol(e, s.id) }} onDrop={(e) => { if (!draggingColId) onDropTask(e, s.id) }}>
+                    {(byStatus[s.id] ?? []).map((t) => (
+                            <TaskCard key={t.id} task={t} project={activeProject} users={users} teams={teams} columns={activeColumns} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} />
+                          ))}
+                          {count === 0 && <div className="flex h-24 flex-col items-center justify-center gap-1 text-slate-400"><div className="h-8 w-8 rounded-lg border-2 border-dashed border-slate-200 grid place-items-center"><IconPlus className="w-3.5 h-3.5 text-slate-300" /></div><span className="text-[11px]">Drop here</span></div>}
               </div>
-            )}
+            </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : boardView === BOARD_VIEWS.list ? (
+              <div className="flex-1 overflow-y-auto">
+                <ListView tasks={filtered.filter((t) => visibleColumns.includes(t.status))} projects={projects} users={users} teams={teams} columns={activeColumns} onSelect={setSelectedTaskId} />
+              </div>
+            ) : boardView === BOARD_VIEWS.timeline ? (
+              /* ── Timeline / Gantt view ── */
+              <div className="flex-1 overflow-auto px-8 py-6">
+                {timelineData && timelineData.days.length > 0 ? (
+                  <div>
+                    {/* header row with day labels */}
+                    <div className="flex items-end mb-2" style={{ paddingLeft: 180 }}>
+                      {timelineData.days.map((day, i) => {
+                        const d = new Date(day + 'T00:00:00')
+                        const isToday = i === timelineData.todayIdx
+                        const isWeekend = d.getDay() === 0 || d.getDay() === 6
+                        return (
+                          <div key={day} className={['flex-shrink-0 text-center text-[10px] leading-tight', isToday ? 'font-bold text-cyan-600' : isWeekend ? 'text-slate-300' : 'text-slate-400'].join(' ')} style={{ width: 44 }}>
+                            <div>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                            <div className={isToday ? 'bg-cyan-500 text-white rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold' : ''}>{d.getDate()}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* task rows */}
+                    <div className="space-y-1">
+                      {timelineData.tasks.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')).map((t) => {
+                        const statusInfo = activeColumns.find((c) => c.id === t.status)
+                        const dayIdx = timelineData.days.indexOf(t.dueDate)
+                        const overdue = isOverdue(t.dueDate) && t.status !== 'done'
+                        const isDone = t.status === 'done'
+                        return (
+                          <div key={t.id} className="flex items-center group" style={{ minHeight: 32 }}>
+                            {/* task label */}
+                            <div className="w-[180px] shrink-0 pr-3 flex items-center gap-2 truncate">
+                              {statusInfo && <span className={['h-2 w-2 rounded-full shrink-0', statusInfo.dot].join(' ')} />}
+                              <button type="button" onClick={() => setSelectedTaskId(t.id)} className={['text-[12px] truncate text-left hover:text-cyan-600 transition-colors', isDone ? 'text-slate-400 line-through' : 'text-slate-700 font-medium'].join(' ')}>{t.title}</button>
+                              {t.priority && <PriorityBadge priority={t.priority} />}
+                            </div>
+                            {/* timeline bar */}
+                            <div className="flex-1 flex relative" style={{ height: 28 }}>
+                              {timelineData.days.map((day, i) => {
+                                const isToday = i === timelineData.todayIdx
+                                const dObj = new Date(day + 'T00:00:00')
+                                const isWeekend = dObj.getDay() === 0 || dObj.getDay() === 6
+                                return (
+                                  <div key={day} className={['flex-shrink-0 border-r', isToday ? 'border-cyan-300 bg-cyan-50/40' : isWeekend ? 'border-slate-100 bg-slate-50/30' : 'border-slate-100'].join(' ')} style={{ width: 44, height: 28 }}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-cyan-100/60') }}
+                                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-cyan-100/60')}
+                                    onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-cyan-100/60'); if (timelineDragTask) { updateTaskDueDate(timelineDragTask, day); setTimelineDragTask(null) } }}
+                                  />
+                                )
+                              })}
+                              {/* the marker dot */}
+                              {dayIdx >= 0 && (
+                                <div className={['absolute top-1/2 -translate-y-1/2 h-5 rounded-full flex items-center gap-1 px-2 text-[10px] font-medium cursor-grab active:cursor-grabbing shadow-sm transition-all', overdue ? 'bg-red-500 text-white' : isDone ? 'bg-emerald-500 text-white' : 'bg-blue-500 text-white'].join(' ')} style={{ left: dayIdx * 44 + 4, minWidth: 36 }}
+                                  draggable onDragStart={() => setTimelineDragTask(t.id)} onDragEnd={() => setTimelineDragTask(null)}
+                                >
+                                  {formatDate(t.dueDate)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* tasks without due dates */}
+                    {timelineData.noDates.length > 0 && (
+                      <div className="mt-6 border-t border-dashed border-slate-200 pt-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">No due date ({timelineData.noDates.length})</div>
+                        <div className="flex flex-wrap gap-2">
+                          {timelineData.noDates.map((t) => (
+                            <button key={t.id} type="button" onClick={() => setSelectedTaskId(t.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-[12px] text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors">
+                              <span className={['h-1.5 w-1.5 rounded-full', activeColumns.find((c) => c.id === t.status)?.dot ?? 'bg-slate-400'].join(' ')} />
+                              {t.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <IconTimeline className="w-10 h-10 text-slate-300" />
+                    <p className="text-sm text-slate-500">Add due dates to tasks to see them on the timeline.</p>
+                  </div>
+                )}
+              </div>
+            ) : boardView === BOARD_VIEWS.heatmap ? (
+              /* ── Workload Heatmap view ── */
+              <div className="flex-1 overflow-auto px-8 py-6">
+                {heatmapData ? (
+                  <div>
+                    <div className="flex items-center gap-3 mb-5">
+                      <IconHeatmap className="w-5 h-5 text-slate-500" />
+                      <div>
+                        <h2 className="text-sm font-semibold text-slate-900">Workload Heatmap</h2>
+                        <p className="text-[11px] text-slate-500">Task distribution per team member over the next 2 weeks. Click a cell to see tasks.</p>
+                      </div>
+                      <div className="flex-1" />
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-emerald-100" /> 1</span>
+                        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-amber-200" /> 2-3</span>
+                        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-red-300" /> 4+</span>
+                      </div>
+                    </div>
+                    {/* header */}
+                    <div className="flex items-end mb-1" style={{ paddingLeft: 160 }}>
+                      {heatmapData.days.map((day) => {
+                        const d = new Date(day + 'T00:00:00')
+                        const isToday = day === new Date().toISOString().slice(0, 10)
+                        const isWeekend = d.getDay() === 0 || d.getDay() === 6
+                        return (
+                          <div key={day} className={['flex-shrink-0 text-center text-[10px] leading-tight', isToday ? 'font-bold text-cyan-600' : isWeekend ? 'text-slate-300' : 'text-slate-400'].join(' ')} style={{ width: 48 }}>
+                            <div>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                            <div className={isToday ? 'bg-cyan-500 text-white rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold' : ''}>{d.getDate()}</div>
+                          </div>
+                        )
+                      })}
+                      <div className="flex-shrink-0 text-center text-[10px] text-slate-400" style={{ width: 60 }}>No date</div>
+                    </div>
+                    {/* user rows */}
+                    {heatmapData.grid.map((row) => (
+                      <div key={row.user.id} className="flex items-center group" style={{ minHeight: 38 }}>
+                        <div className="w-[160px] shrink-0 pr-3 flex items-center gap-2">
+                          <Avatar name={row.user.name} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[12px] font-medium text-slate-700 truncate">{row.user.name}</div>
+                            <div className="text-[10px] text-slate-400">{row.total} task{row.total !== 1 ? 's' : ''}</div>
+                          </div>
+                        </div>
+                        {heatmapData.days.map((day) => {
+                          const ct = row.byDay[day]?.length ?? 0
+                          const bg = ct === 0 ? 'bg-slate-50' : ct === 1 ? 'bg-emerald-100' : ct <= 3 ? 'bg-amber-200' : 'bg-red-300'
+                          const textColor = ct === 0 ? 'text-transparent' : ct <= 3 ? 'text-slate-700' : 'text-red-900'
+                          return (
+                            <div key={day} className={['flex-shrink-0 flex items-center justify-center rounded-md mx-0.5 text-[11px] font-semibold cursor-default transition-colors hover:ring-2 hover:ring-cyan-300', bg, textColor].join(' ')} style={{ width: 44, height: 30 }} title={ct > 0 ? row.byDay[day].map((t) => t.title).join(', ') : 'No tasks'}>
+                              {ct > 0 ? ct : ''}
+                            </div>
+                          )
+                        })}
+                        <div className="flex-shrink-0 flex items-center justify-center rounded-md mx-0.5 text-[11px] font-medium text-slate-400" style={{ width: 56, height: 30 }}>
+                          {row.noDate.length > 0 ? <span className="rounded bg-slate-100 px-2 py-0.5">{row.noDate.length}</span> : '—'}
+                        </div>
+                      </div>
+                    ))}
+                    {/* unassigned row */}
+                    <div className="flex items-center mt-1 pt-1 border-t border-dashed border-slate-200" style={{ minHeight: 38 }}>
+                      <div className="w-[160px] shrink-0 pr-3 flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-slate-100 grid place-items-center text-[10px] text-slate-400 font-bold">?</div>
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-medium text-slate-500">Unassigned</div>
+                          <div className="text-[10px] text-slate-400">{heatmapData.unassigned.total} task{heatmapData.unassigned.total !== 1 ? 's' : ''}</div>
+                        </div>
+                      </div>
+                      {heatmapData.days.map((day) => {
+                        const ct = heatmapData.unassigned.byDay[day]?.length ?? 0
+                        const bg = ct === 0 ? 'bg-slate-50' : ct === 1 ? 'bg-slate-100' : 'bg-slate-200'
+                        return (
+                          <div key={day} className={['flex-shrink-0 flex items-center justify-center rounded-md mx-0.5 text-[11px] font-medium text-slate-500 transition-colors', bg].join(' ')} style={{ width: 44, height: 30 }}>
+                            {ct > 0 ? ct : ''}
+                          </div>
+                        )
+                      })}
+                      <div className="flex-shrink-0 flex items-center justify-center rounded-md mx-0.5 text-[11px] font-medium text-slate-400" style={{ width: 56, height: 30 }}>
+                        {heatmapData.unassigned.noDate.length > 0 ? <span className="rounded bg-slate-100 px-2 py-0.5">{heatmapData.unassigned.noDate.length}</span> : '—'}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <IconHeatmap className="w-10 h-10 text-slate-300" />
+                    <p className="text-sm text-slate-500">No data to display.</p>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
       </main>
@@ -1864,6 +2653,8 @@ export default function DemoPage() {
           key={selectedTask.id}
           task={selectedTask}
           project={projects.find((p) => p.id === selectedTask.projectId)}
+          columns={getProjectColumns(projects.find((p) => p.id === selectedTask.projectId))}
+          allTasks={tasks}
           users={users}
           teams={teams}
           onClose={() => setSelectedTaskId(null)}
@@ -1871,6 +2662,8 @@ export default function DemoPage() {
           onDelete={deleteTask}
           onAddComment={addTaskComment}
           onDeleteComment={deleteTaskComment}
+          onAddBlocker={addBlocker}
+          onRemoveBlocker={removeBlocker}
           buildTaskUrl={buildTaskUrl}
         />
       )}
@@ -1933,10 +2726,38 @@ export default function DemoPage() {
               <button type="button" onClick={() => setShowCreateTask(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
             </div>
             <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {/* quick start: templates + AI */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Quick start <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">— or fill in manually below</span></label>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {TASK_TEMPLATES.map((tpl) => (
+                    <button key={tpl.name} type="button" onClick={() => { const active = taskFormTemplate?.name === tpl.name; if (active) { setTaskFormTemplate(null); setTaskFormTags(''); setTaskFormPriority('') } else { setTaskFormTemplate(tpl); setTaskFormTags(tpl.fields.tags?.join(', ') ?? ''); setTaskFormPriority(tpl.fields.priority ?? '') } }} className={['inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors', taskFormTemplate?.name === tpl.name ? 'border-cyan-400 bg-cyan-50 text-cyan-700 font-medium' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'].join(' ')}>
+                      <span>{tpl.icon}</span>{tpl.name}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => { setShowCreateTask(false); setShowNlpBar(true); setNlpResult(null) }} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/50 px-2.5 py-1.5 text-[12px] text-violet-600 hover:bg-violet-50 hover:border-violet-300 transition-colors">
+                    <IconSparkle className="w-3.5 h-3.5" />Create with AI
+                  </button>
+                </div>
+                {taskFormTemplate && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12px] text-slate-500 animate-[fadeIn_150ms_ease-out]">
+                    <span className="shrink-0 mt-0.5">📋</span>
+                    <span>Will include {taskFormTemplate.fields.subtasks?.length ?? 0} subtask checklist items, tagged <span className="font-medium text-slate-700">{taskFormTemplate.fields.tags?.join(', ')}</span>, priority <span className="font-medium text-slate-700">{taskFormTemplate.fields.priority?.toUpperCase()}</span></span>
+                  </div>
+                )}
+              </div>
+              <div className="h-px bg-slate-100" />
               {/* title */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Title <span className="text-red-400">*</span></label>
-                <input value={taskFormTitle} onChange={(e) => setTaskFormTitle(e.target.value)} placeholder="What needs to be done?" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" autoFocus />
+                <input value={taskFormTitle} onChange={(e) => { setTaskFormTitle(e.target.value); checkDuplicate(e.target.value) }} placeholder="What needs to be done?" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" autoFocus />
+                {duplicateWarning && (
+                  <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-700 animate-[fadeIn_150ms_ease-out]">
+                    <span className="font-medium shrink-0">⚠️ Possible duplicate:</span>
+                    <span className="truncate">{duplicateWarning.key && <span className="font-mono text-[11px] bg-amber-100 rounded px-1 mr-1">{duplicateWarning.key}</span>}{duplicateWarning.task.title}</span>
+                    <span className="text-[10px] text-amber-500 shrink-0">({Math.round(duplicateWarning.score * 100)}% match)</span>
+                  </div>
+                )}
               </div>
               {/* description */}
               <div>
@@ -1948,7 +2769,7 @@ export default function DemoPage() {
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</label>
                   <select value={taskFormStatus} onChange={(e) => setTaskFormStatus(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors appearance-none cursor-pointer">
-                    {STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                    {activeColumns.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1987,6 +2808,83 @@ export default function DemoPage() {
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4 bg-slate-50/50">
               <button type="button" onClick={() => setShowCreateTask(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
               <button type="button" onClick={submitCreateTask} disabled={!taskFormTitle.trim()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Create task</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Column Settings Modal */}
+      {showColumnSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowColumnSettings(false); setAddingColumn(false); setNewColName('') } }}>
+          <div className="w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            {/* header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-600"><IconGear className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Board Columns</h2>
+                  <p className="text-[11px] text-slate-500">Add, remove, reorder, and toggle visibility</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => { setShowColumnSettings(false); setAddingColumn(false); setNewColName('') }} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+            </div>
+
+            {/* body */}
+            <div className="px-6 py-4 space-y-1">
+              {activeColumns.map((s, idx) => {
+                const active = visibleColumns.includes(s.id)
+                const isLast = visibleColumns.length === 1 && active
+                const isPinned = s.id === 'inbox' || s.id === 'done'
+                const isDraggingThis = draggingColId === s.id
+                const isDropTarget = dragOverColIdx === idx && draggingColId && !isPinned
+                return (
+                  <div key={s.id}
+                    draggable={!isPinned}
+                    onDragStart={!isPinned ? (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/column', s.id); setDraggingColId(s.id) } : undefined}
+                    onDragEnd={() => { setDraggingColId(null); setDragOverColIdx(null) }}
+                    onDragOver={!isPinned ? (e) => { e.preventDefault(); setDragOverColIdx(idx) } : undefined}
+                    onDrop={!isPinned ? (e) => { e.preventDefault(); const fromId = e.dataTransfer.getData('text/column') || draggingColId; if (fromId) reorderColumns(fromId, idx); setDraggingColId(null); setDragOverColIdx(null) } : undefined}
+                    className={['flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm group/col-row transition-all', isDraggingThis ? 'opacity-30' : '', isDropTarget ? 'ring-2 ring-cyan-300 bg-cyan-50/40' : 'hover:bg-slate-50'].join(' ')}
+                  >
+                    {!isPinned ? (
+                      <span className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0 transition-colors" title="Drag to reorder">
+                        <IconGripVertical className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
+                    <span className={['h-3 w-3 rounded-full shrink-0', s.dot].join(' ')} />
+                    <span className="flex-1 text-left text-[14px] font-medium text-slate-700">{s.label}</span>
+                    {isPinned && <span className="text-[11px] text-slate-400">(pinned)</span>}
+                    {!isPinned && (
+                      <button type="button" onClick={() => deleteColumn(s.id)} className="rounded-md p-1 text-slate-300 opacity-0 group-hover/col-row:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all" title="Delete column" aria-label={`Delete ${s.label}`}>
+                        <IconX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => !isLast && toggleColumn(s.id)} className={['rounded-md p-1 transition-colors', isLast ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer'].join(' ')} disabled={isLast} title={active ? 'Hide column' : 'Show column'}>
+                      {active ? <IconEye className="w-4 h-4 text-slate-400" /> : <IconEyeOff className="w-4 h-4 text-slate-300" />}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* footer — add column */}
+            <div className="border-t border-slate-100 px-6 py-4">
+              {addingColumn ? (
+                <div className="space-y-2.5">
+                  <input value={newColName} onChange={(e) => setNewColName(e.target.value)} placeholder="Column name…" autoFocus className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus:bg-white transition-colors" onKeyDown={(e) => { if (e.key === 'Enter' && newColName.trim()) addColumn(newColName); if (e.key === 'Escape') { setAddingColumn(false); setNewColName('') } }} />
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" onClick={() => { setAddingColumn(false); setNewColName('') }} className="rounded-lg border border-slate-200 px-3.5 py-2 text-sm text-slate-500 hover:bg-slate-50 transition-colors">Cancel</button>
+                    <button type="button" onClick={() => addColumn(newColName)} disabled={!newColName.trim()} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Add column</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setAddingColumn(true)} className="inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3.5 py-2 text-sm text-slate-500 hover:border-cyan-400 hover:text-cyan-600 hover:bg-cyan-50/30 transition-colors w-full justify-center">
+                  <IconPlus className="w-3.5 h-3.5" />
+                  Add column
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2139,6 +3037,162 @@ export default function DemoPage() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Retro / Weekly Digest Modal */}
+      {showRetro && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowRetro(false); setRetroData(null) } }}>
+          <div className="w-full max-w-2xl mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-linear-to-br from-violet-100 to-cyan-100 text-violet-600"><IconSparkle className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold">Weekly Digest</h2>
+                  <p className="text-[11px] text-slate-500">{activeProject?.name ?? 'Project'} — AI Health Report</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => { setShowRetro(false); setRetroData(null) }} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+            </div>
+            <div className="px-6 py-5 max-h-[75vh] overflow-y-auto">
+              {retroLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="h-8 w-8 rounded-full border-2 border-slate-200 border-t-violet-500 animate-spin" />
+                  <p className="text-sm text-slate-500">Analyzing project health…</p>
+                </div>
+              ) : retroData?.error ? (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{retroData.error}</div>
+              ) : retroData ? (
+                <div className="space-y-5">
+                  {/* health score */}
+                  <div className="flex items-center gap-4">
+                    <div className={['grid h-16 w-16 place-items-center rounded-2xl text-xl font-bold shrink-0', (retroData.healthScore ?? 0) >= 80 ? 'bg-emerald-50 text-emerald-600' : (retroData.healthScore ?? 0) >= 60 ? 'bg-amber-50 text-amber-600' : (retroData.healthScore ?? 0) >= 40 ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'].join(' ')}>{retroData.healthScore ?? '—'}</div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={['text-sm font-semibold', (retroData.healthScore ?? 0) >= 80 ? 'text-emerald-700' : (retroData.healthScore ?? 0) >= 60 ? 'text-amber-700' : 'text-red-700'].join(' ')}>{retroData.healthLabel ?? 'Unknown'}</span>
+                        {retroData.velocity && <span className={['inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', retroData.velocity.trend === 'up' ? 'bg-emerald-100 text-emerald-700' : retroData.velocity.trend === 'down' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'].join(' ')}>{retroData.velocity.trend === 'up' ? '↑' : retroData.velocity.trend === 'down' ? '↓' : '→'} {retroData.velocity.completedThisWeek ?? 0} done this week</span>}
+                      </div>
+                      <p className="mt-1 text-[13px] text-slate-600 leading-relaxed">{retroData.summary ?? ''}</p>
+                    </div>
+                  </div>
+
+                  {retroData.velocity?.note && <p className="text-[12px] text-slate-500 italic bg-slate-50 rounded-lg px-4 py-2">{retroData.velocity.note}</p>}
+
+                  {/* risks */}
+                  {retroData.risks?.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Risks</div>
+                      <div className="space-y-2">
+                        {retroData.risks.map((r, i) => (
+                          <div key={i} className={['rounded-xl border p-3', r.severity === 'high' ? 'border-red-200 bg-red-50/50' : r.severity === 'medium' ? 'border-amber-200 bg-amber-50/50' : 'border-slate-200 bg-slate-50/50'].join(' ')}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={['rounded-md px-1.5 py-0.5 text-[10px] font-semibold', r.severity === 'high' ? 'bg-red-100 text-red-700' : r.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'].join(' ')}>{r.severity}</span>
+                              <span className="text-[13px] font-medium text-slate-800">{r.title}</span>
+                            </div>
+                            <p className="text-[12px] text-slate-600">{r.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* wins */}
+                  {retroData.wins?.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Wins</div>
+                      <ul className="space-y-1">
+                        {retroData.wins.map((w, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2"><span className="text-emerald-500 shrink-0">✓</span>{w}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* recommendations */}
+                  {retroData.recommendations?.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Recommendations</div>
+                      <ul className="space-y-1">
+                        {retroData.recommendations.map((r, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2"><span className="text-cyan-500 shrink-0">→</span>{r}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* workload summary */}
+                  {retroData.workloadSummary && (
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Workload</div>
+                      <p className="text-[13px] text-slate-600">{retroData.workloadSummary}</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Standup Modal */}
+      {showStandup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowStandup(false); setStandupData(null) } }}>
+          <div className="w-full max-w-2xl mx-4 rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden" style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-linear-to-br from-violet-100 to-cyan-100 text-violet-600"><IconSparkle className="w-4 h-4" /></div>
+                <div>
+                  <h2 className="text-sm font-semibold">Daily Standup</h2>
+                  <p className="text-[11px] text-slate-500">{activeProject?.name ?? 'Project'} — Generated by AI</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {standupData && !standupData.error && (
+                  <button type="button" onClick={copyStandup} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><IconClipboard className="w-3.5 h-3.5" />Copy for Slack</button>
+                )}
+                <button type="button" onClick={() => { setShowStandup(false); setStandupData(null) }} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><IconX className="w-4 h-4" /></button>
+              </div>
+            </div>
+            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+              {standupLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="h-8 w-8 rounded-full border-2 border-slate-200 border-t-cyan-500 animate-spin" />
+                  <p className="text-sm text-slate-500">Generating standup summary…</p>
+                </div>
+              ) : standupData?.error ? (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{standupData.error}</div>
+              ) : standupData ? (
+                <div className="space-y-5">
+                  {standupData.summary && <p className="text-sm text-slate-600 leading-relaxed">{standupData.summary}</p>}
+                  {(standupData.members ?? []).map((m, i) => (
+                    <div key={i} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Avatar name={m.name} size="sm" />
+                        <span className="text-sm font-semibold text-slate-900">{m.name}</span>
+                      </div>
+                      <div className="space-y-2 text-[13px]">
+                        {m.done?.length > 0 && (
+                          <div className="flex gap-2"><span className="text-emerald-500 font-medium shrink-0 w-24">✅ Done</span><span className="text-slate-600">{m.done.join(', ')}</span></div>
+                        )}
+                        {m.inProgress?.length > 0 && (
+                          <div className="flex gap-2"><span className="text-blue-500 font-medium shrink-0 w-24">🔄 In Progress</span><span className="text-slate-600">{m.inProgress.join(', ')}</span></div>
+                        )}
+                        {m.blocked?.length > 0 && (
+                          <div className="flex gap-2"><span className="text-red-500 font-medium shrink-0 w-24">🚫 Blocked</span><span className="text-slate-600">{m.blocked.join(', ')}</span></div>
+                        )}
+                        {m.highlights && <div className="mt-1 text-[12px] text-slate-500 italic">💡 {m.highlights}</div>}
+                        {!m.done?.length && !m.inProgress?.length && !m.blocked?.length && <div className="text-slate-400 text-[12px]">No assigned tasks</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {standupData.teamHighlights?.length > 0 && (
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Team Highlights</div>
+                      <ul className="space-y-1">
+                        {standupData.teamHighlights.map((h, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2"><span className="text-slate-400">•</span>{h}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
