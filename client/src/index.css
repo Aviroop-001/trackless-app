@@ -171,6 +171,40 @@
     }
   }
 
+  /* ── Splash overlay animations ── */
+
+  @keyframes splashPulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.15); }
+  }
+
+  @keyframes splashLogoIn {
+    0% { opacity: 0; transform: scale(0.5) rotate(-8deg); filter: blur(8px); }
+    60% { opacity: 1; transform: scale(1.08) rotate(1deg); filter: blur(0); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  }
+
+  @keyframes splashSparkle {
+    0% { opacity: 0; transform: scale(0.3) rotate(-45deg); }
+    50% { opacity: 1; transform: scale(1.15) rotate(10deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+
+  @keyframes splashTextIn {
+    0% { opacity: 0; transform: translateY(12px); letter-spacing: 0.3em; }
+    100% { opacity: 1; transform: translateY(0); letter-spacing: 0.15em; }
+  }
+
+  @keyframes splashSubIn {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 0.5; transform: translateY(0); }
+  }
+
+  @keyframes splashOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* ── Reduced motion ── */
 
   @media (prefers-reduced-motion: reduce) {
