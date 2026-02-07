@@ -201,6 +201,7 @@ function IconFolder({ className = 'w-5 h-5' }) { return <svg className={classNam
 function IconUsers({ className = 'w-5 h-5' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg> }
 function IconPlus({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> }
 function IconArrowLeft({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg> }
+function IconArrowRight({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg> }
 function IconSearch({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg> }
 function IconKanban({ className = 'w-5 h-5' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z" /></svg> }
 function IconX({ className = 'w-4 h-4' }) { return <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg> }
@@ -767,7 +768,7 @@ function TaskDetailPanel({ task, project, users, teams, columns, allTasks, onClo
 
 /* ───────────────────────── task card ────────────────────────── */
 
-function TaskCard({ task, project, users, teams, columns, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew }) {
+function TaskCard({ task, project, users, teams, columns, onAssign, onDragStart, onDragEnd, registerEl, onSelect, isNew, bulkSelected, onBulkToggle, bulkMode }) {
   const resolved = resolveAssignee(task.assigneeId, users, teams ?? [])
   const assignee = resolved?.type === 'user' ? resolved.entity : null
   const assignedTeam = resolved?.type === 'team' ? resolved.entity : null
@@ -777,10 +778,14 @@ function TaskCard({ task, project, users, teams, columns, onAssign, onDragStart,
   const commentCount = (task.comments ?? []).length
 
   return (
-    <div ref={(el) => registerEl?.(task.id, el)} data-task-id={task.id} draggable onDragStart={(e) => onDragStart?.(e, task.id)} onDragEnd={onDragEnd} onClick={() => onSelect?.(task.id)}
-      className={['group cursor-grab rounded-lg border bg-white p-3 shadow-sm transition-all duration-150 hover:shadow-md active:cursor-grabbing active:shadow-lg density-card', overdue ? 'border-red-200 hover:border-red-300' : 'border-slate-200 hover:border-slate-300', isNew ? 'animate-[slideUp_250ms_ease-out]' : ''].join(' ')}>
+    <div ref={(el) => registerEl?.(task.id, el)} data-task-id={task.id} draggable onDragStart={(e) => onDragStart?.(e, task.id)} onDragEnd={onDragEnd} onClick={(e) => { if (e.shiftKey || bulkMode) { e.stopPropagation(); onBulkToggle?.(task.id) } else { onSelect?.(task.id) } }}
+      className={['group cursor-grab rounded-lg border bg-white p-3 shadow-sm transition-all duration-150 hover:shadow-md active:cursor-grabbing active:shadow-lg density-card', bulkSelected ? 'border-cyan-400 ring-2 ring-cyan-200/50 bg-cyan-50/30' : overdue ? 'border-red-200 hover:border-red-300' : 'border-slate-200 hover:border-slate-300', isNew ? 'animate-[slideUp_250ms_ease-out]' : ''].join(' ')}>
       <div className="flex items-start gap-2.5">
-        {statusInfo && <span className={['mt-1.5 h-2 w-2 shrink-0 rounded-full', statusInfo.dot].join(' ')} />}
+        {bulkMode ? (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onBulkToggle?.(task.id) }} className={['mt-1 h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center transition-all', bulkSelected ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300 hover:border-cyan-400'].join(' ')} aria-label="Select task">
+            {bulkSelected && <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>}
+          </button>
+        ) : statusInfo ? <span className={['mt-1.5 h-2 w-2 shrink-0 rounded-full', statusInfo.dot].join(' ')} /> : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-slate-900 leading-snug flex-1">{task.title}</span>
@@ -1204,6 +1209,7 @@ export default function DemoPage() {
   const [timelineDragTask, setTimelineDragTask] = useState(null)
   const [newTaskIds, setNewTaskIds] = useState(new Set())
   const newTaskTimerRef = useRef(null)
+  const [bulkSelectedIds, setBulkSelectedIds] = useState(new Set())
   const [draggingId, setDraggingId] = useState(null)
   const [dragOverStatus, setDragOverStatus] = useState(null)
   const cardElsRef = useRef(new Map())
@@ -1281,7 +1287,7 @@ export default function DemoPage() {
   /* ── keyboard shortcuts ── */
   useEffect(() => {
     const fn = (e) => {
-      if (e.key === 'Escape') { if (showFilterMenu) { setShowFilterMenu(false); return } if (showMoreMenu) { setShowMoreMenu(false); return } if (showSaveView) { setShowSaveView(false); setViewNameDraft(''); return } if (showTemplates) { setShowTemplates(false); return } if (showNlpBar) { setShowNlpBar(false); setNlpInput(''); setNlpResult(null); return } if (showStandup) { setShowStandup(false); setStandupData(null); return } if (showRetro) { setShowRetro(false); setRetroData(null); return } if (focusMode) { setFocusMode(false); return } if (addingColumn) { setAddingColumn(false); setNewColName(''); return } if (renamingColId) { setRenamingColId(null); setRenameColValue(''); return } if (showColumnSettings) { setShowColumnSettings(false); return } if (showCreateProject) { setShowCreateProject(false); return } if (showCreateTask) { setShowCreateTask(false); return } }
+      if (e.key === 'Escape') { if (bulkSelectedIds.size > 0) { setBulkSelectedIds(new Set()); return } if (showFilterMenu) { setShowFilterMenu(false); return } if (showMoreMenu) { setShowMoreMenu(false); return } if (showSaveView) { setShowSaveView(false); setViewNameDraft(''); return } if (showTemplates) { setShowTemplates(false); return } if (showNlpBar) { setShowNlpBar(false); setNlpInput(''); setNlpResult(null); return } if (showStandup) { setShowStandup(false); setStandupData(null); return } if (showRetro) { setShowRetro(false); setRetroData(null); return } if (focusMode) { setFocusMode(false); return } if (addingColumn) { setAddingColumn(false); setNewColName(''); return } if (renamingColId) { setRenamingColId(null); setRenameColValue(''); return } if (showColumnSettings) { setShowColumnSettings(false); return } if (showCreateProject) { setShowCreateProject(false); return } if (showCreateTask) { setShowCreateTask(false); return } }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowCmdPalette((p) => !p); return }
       if (e.key === '?' && !e.metaKey && !e.ctrlKey) { setShowShortcuts((p) => !p); return }
@@ -1343,7 +1349,7 @@ export default function DemoPage() {
   const navigate = (nextView, projectId = null) => {
     setData((prev) => ({ ...prev, view: nextView, activeProjectId: projectId ?? prev.activeProjectId }))
     if (nextView === NAV.board) setBoardView(settings.defaultView === 'list' ? BOARD_VIEWS.list : BOARD_VIEWS.kanban)
-    setQuery(''); setTagQuery(''); setSelectedTaskId(null); setActiveFilters([]); setShowProjectComments(false)
+    setQuery(''); setTagQuery(''); setSelectedTaskId(null); setActiveFilters([]); setShowProjectComments(false); setBulkSelectedIds(new Set())
   }
 
   const updateSettings = (patch) => setData((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }))
@@ -1482,6 +1488,40 @@ export default function DemoPage() {
   const assignTask = (tid, aid) => setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === tid ? { ...t, assigneeId: aid } : t) }))
   const updateTask = (tid, u) => setData((p) => ({ ...p, tasks: p.tasks.map((t) => t.id === tid ? { ...t, ...u } : t) }))
   const deleteTask = (tid) => { if (tid === selectedTaskId) setSelectedTaskId(null); setData((p) => ({ ...p, tasks: p.tasks.filter((t) => t.id !== tid) })) }
+
+  /* ── bulk operations ── */
+  const toggleBulkSelect = (taskId) => {
+    setBulkSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+  const clearBulkSelection = () => setBulkSelectedIds(new Set())
+  const bulkMoveTo = (status) => {
+    setData((p) => ({
+      ...p,
+      tasks: p.tasks.map((t) => bulkSelectedIds.has(t.id) ? { ...t, status } : t),
+    }))
+    clearBulkSelection()
+  }
+  const bulkDelete = () => {
+    if (selectedTaskId && bulkSelectedIds.has(selectedTaskId)) setSelectedTaskId(null)
+    setData((p) => ({ ...p, tasks: p.tasks.filter((t) => !bulkSelectedIds.has(t.id)) }))
+    clearBulkSelection()
+  }
+  const bulkAssign = (assigneeId) => {
+    setData((p) => ({
+      ...p,
+      tasks: p.tasks.map((t) => bulkSelectedIds.has(t.id) ? { ...t, assigneeId: assigneeId || null } : t),
+    }))
+    clearBulkSelection()
+  }
+  const selectAllVisible = () => {
+    const ids = filtered.filter((t) => visibleColumns.includes(t.status)).map((t) => t.id)
+    setBulkSelectedIds(new Set(ids))
+  }
 
   const updateProject = (pid, u) => setData((p) => ({ ...p, projects: p.projects.map((x) => x.id === pid ? { ...x, ...u } : x) }))
 
@@ -1932,7 +1972,7 @@ export default function DemoPage() {
   const onDragOverCol = (e, s) => { e.preventDefault(); setDragOverStatus(s) }
   const onDropTask = (e, s) => { e.preventDefault(); let id; try { id = e.dataTransfer.getData('text/plain') } catch { /* */ } const nid = id || draggingId; if (!nid) return; moveTask(nid, s, computeIdx(e.currentTarget.querySelector(`[data-column-list="${s}"]`) ?? e.currentTarget, e.clientY)); setDraggingId(null); setDragOverStatus(null) }
 
-  const resetDemo = () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* */ } setSelectedTaskId(null); const u = seedUsers(); const t = seedTeams(u); const p = seedProjects(u); setData({ projects: p, users: u, teams: t, tasks: seedTasks(p[0].id, p[1].id, u, t), activeProjectId: null, view: NAV.projects, settings: { ...DEFAULT_SETTINGS } }) }
+  const resetDemo = () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* */ } setSelectedTaskId(null); setBulkSelectedIds(new Set()); const u = seedUsers(); const t = seedTeams(u); const p = seedProjects(u); setData({ projects: p, users: u, teams: t, tasks: seedTasks(p[0].id, p[1].id, u, t), activeProjectId: null, view: NAV.projects, settings: { ...DEFAULT_SETTINGS } }) }
 
   const projectStats = useMemo(() => { const m = {}; for (const p of projects) m[p.id] = { total: 0, done: 0 }; for (const t of tasks) { if (m[t.projectId]) { m[t.projectId].total++; if (t.status === 'done') m[t.projectId].done++ } } return m }, [projects, tasks])
 
@@ -2380,6 +2420,56 @@ export default function DemoPage() {
               </div>
             </div>
 
+            {/* bulk action bar */}
+            {bulkSelectedIds.size > 0 && (
+              <div className="shrink-0 border-b px-8 py-2 flex items-center gap-3 animate-[fadeIn_150ms_ease-out]" style={{ borderColor: 'var(--demo-border)', background: 'var(--demo-surface)' }}>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={clearBulkSelection} className="rounded p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Clear selection">
+                    <IconX className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[13px] font-semibold text-cyan-700">{bulkSelectedIds.size} selected</span>
+                  <button type="button" onClick={selectAllVisible} className="text-[11px] text-cyan-600 hover:text-cyan-700 underline underline-offset-2 transition-colors">Select all</button>
+                </div>
+                <div className="h-4 w-px bg-slate-200" />
+                {/* move to */}
+                <div className="relative group/bulkmove">
+                  <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                    <IconArrowRight className="w-3 h-3" />Move to
+                    <IconChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                  <div className="absolute left-0 top-full mt-1 z-30 w-44 rounded-xl border border-slate-200 shadow-lg bg-white p-1 hidden group-hover/bulkmove:block">
+                    {activeColumns.map((col) => (
+                      <button key={col.id} type="button" onClick={() => bulkMoveTo(col.id)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className={['h-2 w-2 rounded-full shrink-0', col.dot].join(' ')} />
+                        {col.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* assign to */}
+                <div className="relative group/bulkassign">
+                  <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                    <IconUsers className="w-3 h-3" />Assign
+                    <IconChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                  <div className="absolute left-0 top-full mt-1 z-30 w-48 rounded-xl border border-slate-200 shadow-lg bg-white p-1 hidden group-hover/bulkassign:block">
+                    <button type="button" onClick={() => bulkAssign(null)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-slate-500 hover:bg-slate-50 transition-colors italic">Unassign</button>
+                    {users.map((u) => (
+                      <button key={u.id} type="button" onClick={() => bulkAssign(u.id)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-slate-700 hover:bg-slate-50 transition-colors">
+                        <Avatar name={u.name} size="sm" />{u.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* delete */}
+                <button type="button" onClick={bulkDelete} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-50 transition-colors">
+                  <IconTrash className="w-3 h-3" />Delete
+                </button>
+                <div className="flex-1" />
+                <span className="text-[10px] text-slate-400">Shift+click or use checkboxes to select</span>
+              </div>
+            )}
+
             {/* board body */}
             {focusMode ? (
               <div className="flex-1 overflow-y-auto px-8 py-6">
@@ -2458,7 +2548,7 @@ export default function DemoPage() {
                         </div>
                         <div className={['flex-1 space-y-2 rounded-xl p-2 min-h-[120px] transition-colors duration-150', dragOverStatus === s.id && !draggingColId ? 'bg-cyan-50/70 ring-2 ring-cyan-200/70' : 'bg-slate-50/60'].join(' ')} data-column-list={s.id} onDragOver={(e) => { if (!draggingColId) onDragOverCol(e, s.id) }} onDrop={(e) => { if (!draggingColId) onDropTask(e, s.id) }}>
                     {(byStatus[s.id] ?? []).map((t) => (
-                            <TaskCard key={t.id} task={t} project={activeProject} users={users} teams={teams} columns={activeColumns} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} />
+                            <TaskCard key={t.id} task={t} project={activeProject} users={users} teams={teams} columns={activeColumns} onAssign={assignTask} onDragStart={onDragStart} onDragEnd={onDragEnd} registerEl={registerEl} onSelect={setSelectedTaskId} isNew={newTaskIds.has(t.id)} bulkSelected={bulkSelectedIds.has(t.id)} onBulkToggle={toggleBulkSelect} bulkMode={bulkSelectedIds.size > 0} />
                           ))}
                           {count === 0 && <div className="flex h-24 flex-col items-center justify-center gap-1 text-slate-400"><div className="h-8 w-8 rounded-lg border-2 border-dashed border-slate-200 grid place-items-center"><IconPlus className="w-3.5 h-3.5 text-slate-300" /></div><span className="text-[11px]">Drop here</span></div>}
               </div>

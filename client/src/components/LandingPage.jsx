@@ -7,7 +7,6 @@ import HowItWorksSection from './landing/HowItWorksSection'
 import AICapabilitiesSection from './landing/AICapabilitiesSection'
 import AudienceSection from './landing/AudienceSection'
 import ComparisonSection from './landing/ComparisonSection'
-import PreviewSection from './landing/PreviewSection'
 import FAQSection from './landing/FAQSection'
 import FounderSection from './landing/FounderSection'
 import WaitlistSection from './landing/WaitlistSection'
@@ -32,9 +31,8 @@ export default function LandingPage() {
         <AICapabilitiesSection />
         <AudienceSection />
         <ComparisonSection />
-        <PreviewSection />
-        <FAQSection />
         <FounderSection />
+        <FAQSection />
         <WaitlistSection />
         <Footer />
       </div>

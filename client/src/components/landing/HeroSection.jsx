@@ -31,7 +31,7 @@ export default function HeroSection() {
 
             <ScrollSection delay={250}>
               <p className="mt-5 max-w-[380px] text-[15px] leading-relaxed text-white/50">
-                Smart nudges, auto-generated plans, and zero busywork. The tracker that thinks alongside you.
+                Your team spends more time updating JIRA than building. Nudge AI replaces that with smart nudges, auto-generated plans, and zero busywork.
               </p>
             </ScrollSection>
 

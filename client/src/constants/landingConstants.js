@@ -6,9 +6,8 @@ export const SECTIONS = [
   { id: 'ai', label: 'AI Features' },
   { id: 'audience', label: "Who it's for" },
   { id: 'features', label: 'Comparison' },
-  { id: 'preview', label: 'Preview' },
-  { id: 'faq', label: 'FAQ' },
   { id: 'founder', label: 'Built by' },
+  { id: 'faq', label: 'FAQ' },
   { id: 'waitlist', label: 'Waitlist' },
 ]
 
