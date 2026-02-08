@@ -22,7 +22,7 @@ export const COMPARE = [
 
 export const FAQ = [
   { q: 'Is this trying to replace every JIRA feature?', a: 'No. We replace the 20% of JIRA that 80% of teams actually use—task capture, lightweight organization, and shipping visibility—with AI that actively helps you manage, not just track.' },
-  { q: 'Can I track non-engineering work too?', a: "Absolutely. Nudge AI is intentionally generic. Marketing campaigns, hiring pipelines, personal to-dos—if it's work, it fits." },
+  { q: 'Is this only for dev teams?', a: "Not at all. Marketing teams, agencies, freelancers, ops teams, product managers—anyone who tracks work uses Nudge AI. If it's work, it fits." },
   { q: 'What makes the AI different from other tools?', a: 'Most tools bolt on AI as a chatbot. Nudge AI bakes intelligence into every workflow—nudges watch your board, NLP creates tasks from plain English, standups are generated in one click, and weekly digests surface risks before you spot them.' },
   { q: 'What AI features are available?', a: 'Smart nudges, natural language task creation, AI project generation, standup generator, weekly health digest, and smart duplicate detection. All powered by AI, all built in—no plugins or add-ons.' },
   { q: 'What views does Nudge AI support?', a: 'Kanban board, list view, timeline/Gantt, workload heatmap, and focus mode. Plus custom saved views with multi-filter support so you can slice your board any way you want.' },
@@ -44,17 +44,32 @@ export const AUDIENCE = [
   {
     icon: 'rocket',
     title: 'Startup founders',
-    desc: "Stop configuring tools. Start shipping your MVP. Nudge AI gives you structure without ceremony—so you focus on what matters.",
+    desc: 'Stop configuring tools. Start shipping your MVP. Structure without ceremony.',
   },
   {
     icon: 'team',
-    title: 'Small dev teams (2-10)',
-    desc: 'All the structure you need, none of the bloat. Your team gets Kanban boards, smart nudges, and AI insights without a 3-day JIRA setup.',
+    title: 'Small teams (2-15)',
+    desc: 'Kanban boards, AI nudges, and standups without a 3-day JIRA setup.',
+  },
+  {
+    icon: 'megaphone',
+    title: 'Marketing & content',
+    desc: 'Campaign trackers, content calendars, launch checklists — no spreadsheets needed.',
+  },
+  {
+    icon: 'briefcase',
+    title: 'Agencies & freelancers',
+    desc: 'Juggle multiple client projects. AI keeps every workstream on track.',
+  },
+  {
+    icon: 'chart',
+    title: 'Product & ops teams',
+    desc: 'Roadmaps, hiring pipelines, process tracking — PM tools that don\'t feel "too dev."',
   },
   {
     icon: 'code',
     title: 'Solo builders',
-    desc: "Your personal PM that never sleeps. Describe what you're building, get a structured plan in seconds, and let AI keep you on track.",
+    desc: 'Describe what you\'re building, get a plan in seconds. Your personal AI PM.',
   },
 ]
 
